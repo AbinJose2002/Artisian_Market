@@ -1,0 +1,16 @@
+.navbar-brand {
+    font-size: 1.5rem;
+  }
+  
+  .cart-icon {
+    position: relative;
+  }
+  
+  .profile-icon {
+    cursor: pointer;
+  }
+  
+  .dropdown-menu {
+    min-width: 150px;
+  }
+  

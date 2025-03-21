@@ -1,0 +1,57 @@
+/* src/components/Sidebar.css */
+.sidebar {
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+    width: 200px;
+    border-right: 1px solid #ccc;
+    padding: 10px;
+    transition: width 0.3s;
+    background-color: #f8f9fa; /* Light background color */
+}
+
+.sidebar.collapsed {
+    width: 60px;
+}
+
+.sidebar h3 {
+    display: block;
+    margin: 0;
+    padding: 10px 0;
+    font-size: 1.5em;
+}
+
+.sidebar ul {
+    list-style-type: none;
+    padding: 0;
+}
+
+.sidebar li {
+    border-radius: 20px;
+    display: flex;
+    align-items: center;
+    padding: 25px 10px;
+    transition: background-color 0.3s;
+}
+
+.sidebar li:hover {
+    background-color: #e9ecef; /* Light hover effect */
+}
+
+.sidebar a {
+    text-decoration: none;
+    color: #333; /* Dark text color */
+    flex-grow: 1; /* Allow link to take full width */
+}
+
+.sidebar a:hover {
+    color: #007bff; /* Change color on hover */
+}
+
+.toggle-button {
+    background: none;
+    border: none;
+    cursor: pointer;
+    margin-bottom: 10px;
+    font-size: 1.5em; /* Increase icon size */
+}
