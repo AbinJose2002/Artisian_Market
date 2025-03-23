@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { BsCart, BsPersonCircle } from "react-icons/bs";
+import { BsCart, BsPersonCircle, BsHeart } from "react-icons/bs";
 import "bootstrap/dist/css/bootstrap.min.css";
 import "./Navbar.css"; // For additional styling
 
@@ -25,7 +25,7 @@ const Navbar = () => {
   };
 
   return (
-    <nav className="navbar navbar-expand-lg navbar-light bg-light px-5">
+    <nav className="navbar navbar-expand-lg navbar-dark nav-custom px-5">
       <Link className="navbar-brand fw-bold" to="/">MyBrand</Link>
 
       <button
@@ -58,6 +58,9 @@ const Navbar = () => {
         <Link className="nav-link me-3 cart-icon" to="/cart">
           <BsCart size={22} />
         </Link>
+        <Link className="nav-link me-3" to="/wishlist">
+          <BsHeart size={22} />
+        </Link>
 
         {role ? (
           <div className="dropdown">
@@ -76,7 +79,7 @@ const Navbar = () => {
         ) : (
           <div className="dropdown">
             <button
-              className="btn btn-outline-primary dropdown-toggle"
+              className="btn btn-outline-light dropdown-toggle"
               type="button"
               data-bs-toggle="dropdown"
             >

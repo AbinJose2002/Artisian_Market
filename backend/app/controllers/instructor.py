@@ -6,13 +6,18 @@ from werkzeug.utils import secure_filename
 import os
 import uuid
 from bson.objectid import ObjectId
+from app import (
+    events_collection,
+    instructor_collection,
+    users_collection  # Add users_collection import
+)
 
 # Create the blueprint
 instructor_bp = Blueprint('instructor', __name__)
 
 # Create upload directories
-UPLOAD_FOLDER_PROFILE = 'uploads/profile_photos'
-UPLOAD_FOLDER_POSTER = 'uploads/event_posters'
+UPLOAD_FOLDER_PROFILE = os.path.join(os.getcwd(), 'uploads', 'profile_photos')
+UPLOAD_FOLDER_POSTER = os.path.join(os.getcwd(), 'uploads', 'event_posters')
 os.makedirs(UPLOAD_FOLDER_PROFILE, exist_ok=True)
 os.makedirs(UPLOAD_FOLDER_POSTER, exist_ok=True)
 
@@ -235,7 +240,227 @@ def delete_event(event_id):
     
     return jsonify(success=True, message="Event deleted successfully")
 
-@instructor_bp.route('/uploads/<path:folder>/<path:filename>')
-def serve_uploads(folder, filename):
-    """Serve uploaded files"""
-    return send_from_directory(f'uploads/{folder}', filename)
+@instructor_bp.route('/events/list', methods=['GET'])
+def list_all_events():
+    """List all events for public view"""
+    try:
+        from app import events_collection
+        events = list(events_collection.find())
+        
+        # Debug logging
+        print(f"Found {len(events)} events")
+        
+        processed_events = []
+        for event in events:
+            try:
+                processed_event = {
+                    '_id': str(event['_id']),
+                    'name': event.get('name', ''),
+                    'description': event.get('description', ''),
+                    'type': event.get('type', ''),
+                    'date': event.get('date', ''),
+                    'time': event.get('time', ''),
+                    'fee': event.get('fee', ''),
+                    'duration': event.get('duration', ''),
+                    'instructor_id': str(event.get('instructor_id', '')),
+                }
+                
+                if event.get('poster'):
+                    processed_event['poster'] = event['poster']
+                    processed_event['poster_url'] = f"{request.host_url.rstrip('/')}/uploads/event_posters/{event['poster']}"
+                
+                processed_events.append(processed_event)
+            except Exception as e:
+                print(f"Error processing event {event.get('_id')}: {str(e)}")
+                continue
+        
+        return jsonify(success=True, events=processed_events)
+        
+    except Exception as e:
+        print(f"Server error in list_all_events: {str(e)}")
+        return jsonify(success=False, message="Internal server error"), 500
+
+@instructor_bp.route('/events/registered', methods=['GET'])
+@jwt_required()
+def get_registered_events():
+    try:
+        user_email = get_jwt_identity()
+        if not user_email:
+            return jsonify(success=False, message="Authentication required"), 401
+
+        print(f"Fetching registered events for user: {user_email}")
+        
+        # Initialize empty events list
+        processed_events = []
+        
+        try:
+            # Find all events where user is registered
+            events = list(events_collection.find({
+                'registered_users.user_id': user_email
+            }))
+            
+            print(f"Found {len(events)} events")
+            
+            # Process each event
+            for event in events:
+                processed_event = {
+                    '_id': str(event['_id']),
+                    'name': event.get('name'),
+                    'description': event.get('description'),
+                    'type': event.get('type'),
+                    'date': event.get('date'),
+                    'time': event.get('time'),
+                    'fee': event.get('fee'),
+                    'duration': event.get('duration'),
+                    'place': event.get('place'),
+                    'poster': event.get('poster'),
+                    'instructor_id': str(event['instructor_id'])
+                }
+                
+                # Find user's registration
+                registration = next(
+                    (reg for reg in event.get('registered_users', []) 
+                     if reg['user_id'] == user_email),
+                    None
+                )
+                
+                if registration:
+                    processed_event['registration_details'] = {
+                        'payment_status': registration.get('payment_status', 'pending'),
+                        'payment_date': registration.get('payment_date', '').strftime('%Y-%m-%d %H:%M:%S') if registration.get('payment_date') else None
+                    }
+                    processed_events.append(processed_event)
+            
+            return jsonify(success=True, events=processed_events)
+            
+        except Exception as e:
+            print(f"Database error: {str(e)}")
+            return jsonify(success=False, message="Database error"), 500
+            
+    except Exception as e:
+        print(f"Error in get_registered_events: {str(e)}")
+        return jsonify(success=False, message=str(e)), 500
+
+@instructor_bp.route('/events/<event_id>/participants', methods=['GET'])
+@jwt_required()
+def get_event_participants(event_id):
+    try:
+        instructor_email = get_jwt_identity()
+        instructor = instructor_collection.find_one({"email": instructor_email})
+        
+        if not instructor:
+            return jsonify(success=False, message="Instructor not found"), 404
+
+        event = events_collection.find_one({
+            "_id": ObjectId(event_id),
+            "instructor_id": instructor["_id"]
+        })
+
+        if not event:
+            return jsonify(success=False, message="Event not found or unauthorized"), 404
+
+        participants = []
+        for registration in event.get('registered_users', []):
+            user = users_collection.find_one({"email": registration['user_id']})
+            if user:
+                participants.append({
+                    'email': user['email'],
+                    'name': f"{user.get('first_name', '')} {user.get('last_name', '')}",
+                    'payment_status': registration['payment_status'],
+                    'payment_date': registration.get('payment_date', '').strftime('%Y-%m-%d %H:%M:%S') if registration.get('payment_date') else None
+                })
+
+        print(f"Found {len(participants)} participants for event {event_id}")
+        return jsonify(success=True, participants=participants)
+
+    except Exception as e:
+        print(f"Error fetching participants: {str(e)}")
+        return jsonify(success=False, message=str(e)), 500
+
+@instructor_bp.route('/profile', methods=['GET'])
+@jwt_required()
+def get_profile():
+    try:
+        instructor_email = get_jwt_identity()
+        instructor = instructor_collection.find_one({"email": instructor_email})
+        
+        if not instructor:
+            return jsonify(success=False, message="Instructor not found"), 404
+
+        profile = {
+            'email': instructor['email'],
+            'first_name': instructor.get('first_name', ''),
+            'last_name': instructor.get('last_name', ''),
+            'mobile': instructor.get('mobile', ''),
+            'address': instructor.get('address', ''),
+            'gender': instructor.get('gender', ''),
+            'art_specialization': instructor.get('art_specialization', ''),
+            'profile_photo': instructor.get('profile_photo')
+        }
+        
+        return jsonify(success=True, profile=profile)
+
+    except Exception as e:
+        print(f"Error fetching profile: {str(e)}")
+        return jsonify(success=False, message=str(e)), 500
+
+@instructor_bp.route('/profile/update', methods=['PUT'])
+@jwt_required()
+def update_profile():
+    try:
+        instructor_email = get_jwt_identity()
+        update_data = {}
+        
+        # Handle form data
+        for field in ['first_name', 'last_name', 'mobile', 'address', 'gender', 'art_specialization']:
+            if field in request.form:
+                update_data[field] = request.form[field]
+
+        # Handle profile photo
+        if 'profile_photo' in request.files:
+            photo = request.files['profile_photo']
+            if photo.filename:
+                filename = save_file(photo, UPLOAD_FOLDER_PROFILE)
+                update_data['profile_photo'] = filename
+
+        # Update profile
+        result = instructor_collection.update_one(
+            {"email": instructor_email},
+            {"$set": update_data}
+        )
+
+        if result.modified_count:
+            return jsonify(success=True, message="Profile updated successfully")
+        return jsonify(success=True, message="No changes made")
+
+    except Exception as e:
+        print(f"Error updating profile: {str(e)}")
+        return jsonify(success=False, message=str(e)), 500
+
+@instructor_bp.route('/events/<event_id>', methods=['GET'])
+@jwt_required()
+def get_event_details(event_id):
+    try:
+        instructor_email = get_jwt_identity()
+        instructor = instructor_collection.find_one({"email": instructor_email})
+        
+        if not instructor:
+            return jsonify(success=False, message="Instructor not found"), 404
+
+        event = events_collection.find_one({
+            "_id": ObjectId(event_id),
+            "instructor_id": instructor["_id"]
+        })
+
+        if not event:
+            return jsonify(success=False, message="Event not found or unauthorized"), 404
+
+        # Convert ObjectId to string for JSON serialization
+        event['_id'] = str(event['_id'])
+        event['instructor_id'] = str(event['instructor_id'])
+
+        return jsonify(success=True, event=event)
+
+    except Exception as e:
+        print(f"Error fetching event details: {str(e)}")
+        return jsonify(success=False, message=str(e)), 500

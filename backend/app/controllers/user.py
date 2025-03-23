@@ -43,18 +43,25 @@ def register():
     # Hash the password before storing it
     hashed_password = bcrypt.generate_password_hash(password).decode('utf-8')
 
-    # Insert user into MongoDB
-    users_collection.insert_one({
+    # Insert user into MongoDB with initialized cart and wishlist
+    user_data = {
         "email": email,
         "password": hashed_password,
         "first_name": fname,
         "last_name": lname,
         "mobile": mobile,
         "address": address,
-        "profile_photo": filename  # Save file path or filename
-    })
+        "profile_photo": filename,
+        "cart": [],  # Initialize empty cart array
+        "wishlist": [],  # Initialize empty wishlist array
+    }
+    
+    users_collection.insert_one(user_data)
 
-    return jsonify(success=True, message="User registered successfully!")
+    # Create token
+    access_token = create_access_token(identity=email)
+    
+    return jsonify(success=True, message="User registered successfully!", token=access_token)
 
 @user_bp.route('/login', methods=['POST'])
 def login():

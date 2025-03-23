@@ -1,42 +1,66 @@
 // src/components/Dashboard.js
-import React, { useEffect, useState } from 'react';
+import React, { useState } from 'react';
 import { Outlet } from 'react-router-dom';
 import Sidebar from './Sidebar';
-import EventManager from "./EventManager"
-import TrackOrder from "./TrackOrder"
+import EventManager from './EventManager';
+import EventParticipants from './EventParticipants';
+import Earnings from './Earnings';
+import Profile from './Profile';
 
-const InstructorHome = () => {
-    const [selected, setSelected] = useState('case'); // Default selected link
-    
-    
+function InstructorHome() {
+    const [selected, setSelected] = useState('events');
+    const [currentEventId, setCurrentEventId] = useState(null);
+
+    const handleEventSelect = (eventId) => {
+        setCurrentEventId(eventId);
+        // Automatically switch to participants view when an event is selected
+        setSelected('participants');
+    };
+
+    const renderContent = () => {
+        switch(selected) {
+            case 'events':
+                return <EventManager onSelectEvent={handleEventSelect} />;
+            case 'participants':
+                return currentEventId ? (
+                    <div>
+                        <button 
+                            className="btn btn-outline-primary mb-3"
+                            onClick={() => setSelected('events')}
+                        >
+                            ← Back to Events
+                        </button>
+                        <EventParticipants eventId={currentEventId} />
+                    </div>
+                ) : (
+                    <div className="alert alert-info">
+                        <p>Please select an event first</p>
+                        <button 
+                            className="btn btn-primary mt-2"
+                            onClick={() => setSelected('events')}
+                        >
+                            Go to Events
+                        </button>
+                    </div>
+                );
+            case 'profile':
+                return <Profile />;
+            case 'earnings':
+                return <Earnings />;
+            default:
+                return <EventManager onSelectEvent={handleEventSelect} />;
+        }
+    };
+
     return (
-        <>
-            {/* <Navbar /> */}
-            <div style={{ display: 'flex' }}>
-                <Sidebar setSelected={setSelected} />
-                <div style={{ padding: '20px', flex: 1 }}>
-                    {/* <h2>Selected: {selected}</h2> Display the selected link */}
-                    {(() => {
-    switch (selected) {
-        case 'order':
-            return <TrackOrder />;  // Added return
-        // case 'profile':
-        //     return <Profile />;
-        // case 'payment':
-        //     return <Payment />;
-        // case 'document':
-        //     return <Document />;
-        // case 'consult':
-        //     return <Consultation />;
-        default:
-            return <EventManager />;
-    }
-})()}
-                    <Outlet />
-                </div>
+        <div style={{ display: 'flex' }}>
+            <Sidebar setSelected={setSelected} />
+            <div style={{ padding: '20px', flex: 1 }}>
+                {renderContent()}
+                <Outlet />
             </div>
-        </>
+        </div>
     );
-};
+}
 
 export default InstructorHome;

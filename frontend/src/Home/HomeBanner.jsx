@@ -1,28 +1,49 @@
 import React from "react";
-import artillu from '../assets/art-illu.jpg'; // Import the image
-import "./HomeBanner.css"; // Add custom styling if needed
+import artillu from '../assets/art-illu.jpg';
+import "./HomeBanner.css";
 
 const HomeBanner = () => {
   return (
-    <div className="container-fluid banner-container d-flex align-items-center justify-content-center py-5">
-      <div className="row w-100">
-        {/* Left Side - Text Content */}
-        <div className="col-md-6 d-flex flex-column justify-content-center text-center text-md-start px-4">
-          <h1 className="fw-bold">Discover the Art Within</h1>
-          <p className="lead">
-            Welcome to our exclusive Art Store! Find unique, handcrafted pieces
-            that tell a story and inspire creativity.
-          </p>
-          <button className="btn btn-primary mt-3 col-3">Explore Now</button>
-        </div>
+    <div className="banner-wrapper">
+      <div className="banner-container">
+        <div className="banner-overlay"></div>
+        <div className="container position-relative">
+          <div className="row h-100 align-items-center">
+            <div className="col-md-6 banner-content">
+              <h1 className="mega-title">
+                <span className="highlight">Discover</span> Unique
+                <span className="d-block">Artisan Creations</span>
+              </h1>
+              <p className="banner-subtitle">
+                Explore handcrafted masterpieces from talented artists worldwide
+              </p>
 
-        {/* Right Side - Image */}
-        <div className="col-md-6 d-flex justify-content-center align-items-center">
-          <img
-            src={artillu}
-            alt="Art Store"
-            className="img-fluid rounded "
-          />
+              <div className="category-pills">
+                <span className="pill">Paintings</span>
+                <span className="pill">Sculptures</span>
+                <span className="pill">Digital Art</span>
+                <span className="pill">Photography</span>
+              </div>
+            </div>
+            
+            <div className="col-md-6 banner-image-container">
+              <img
+                src={artillu}
+                alt="Art Store"
+                className="floating-image"
+              />
+              <div className="stats-card">
+                <div className="stat-item">
+                  <span className="stat-number">1000+</span>
+                  <span className="stat-label">Artworks</span>
+                </div>
+                <div className="stat-item">
+                  <span className="stat-number">500+</span>
+                  <span className="stat-label">Artists</span>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
     </div>

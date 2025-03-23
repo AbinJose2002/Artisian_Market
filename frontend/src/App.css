@@ -1,0 +1,39 @@
+:root {
+  --primary-color: #3a1d6e;
+  --primary-hover: #4b2d89;
+  --secondary-color: #f8f9fc;
+  --accent-color: #2ecc71;
+  --text-dark: #1a1c2a;
+  --text-light: #4a4f6c;
+}
+
+.btn-custom-primary {
+  background-color: var(--primary-color);
+  color: white;
+  border: none;
+}
+
+.btn-custom-primary:hover {
+  background-color: var(--primary-hover);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(58, 29, 110, 0.2);
+}
+
+.nav-custom {
+  background-color: var(--primary-color) !important;
+}
+
+.card-custom {
+  border: none;
+  transition: transform 0.3s ease;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+
+.card-custom:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 8px 15px rgba(0, 0, 0, 0.2);
+}
+
+.badge-custom {
+  background-color: var(--primary-color);
+}

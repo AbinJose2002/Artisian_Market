@@ -1,47 +1,37 @@
 // src/components/Sidebar.js
-import React, { useState } from 'react';
-import { Link } from 'react-router-dom';
-import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faArrowLeft, faArrowRight, faFileAlt, faMoneyBill, faFolder, faComments, faUser, faCalendarDays } from '@fortawesome/free-solid-svg-icons';
-import './Sidebar.css'; // Import the CSS file
+import React from 'react';
 
-const Sidebar = ({ setSelected }) => {
-    const [isCollapsed, setIsCollapsed] = useState(false);
-
-    const toggleSidebar = () => {
-        setIsCollapsed(!isCollapsed);
-    };
+function Sidebar({ setSelected }) {
+    const menuItems = [
+        { id: 'events', label: 'Manage Events', icon: '📅' },
+        { id: 'participants', label: 'Participants', icon: '👥' },
+        { id: 'earnings', label: 'Earnings', icon: '💰' },
+        { id: 'profile', label: 'Profile', icon: '⚙️' }
+    ];
 
     return (
-        <div className={`sidebar ${isCollapsed ? 'collapsed' : ''}`}>
-            <button onClick={toggleSidebar} className="toggle-button">
-                <FontAwesomeIcon icon={isCollapsed ? faArrowRight : faArrowLeft} />
-            </button>
-            <h3 style={{ display: isCollapsed ? 'none' : 'block' }}>Dashboard</h3>
-            <ul>
-                <li onClick={() => setSelected('case')}>
-                    <FontAwesomeIcon icon={faCalendarDays} style={{ marginRight: '10px', display: isCollapsed ? 'none' : 'block' }} />
-                    <Link style={{ display: isCollapsed ? 'none' : 'block' }}>Event Details</Link>
-                </li>
-                <li onClick={() => setSelected('order')}>
-                    <FontAwesomeIcon icon={faMoneyBill} style={{ marginRight: '10px', display: isCollapsed ? 'none' : 'block' }} />
-                    <Link style={{ display: isCollapsed ? 'none' : 'block' }}>Track Order</Link>
-                </li>
-                {/*<li onClick={() => setSelected('document')}>
-                    <FontAwesomeIcon icon={faFolder} style={{ marginRight: '10px', display: isCollapsed ? 'none' : 'block' }} />
-                    <Link style={{ display: isCollapsed ? 'none' : 'block' }}>Document</Link>
-                </li>
-                <li onClick={() => setSelected('consult')}>
-                    <FontAwesomeIcon icon={faComments} style={{ marginRight: '10px', display: isCollapsed ? 'none' : 'block' }} />
-                    <Link style={{ display: isCollapsed ? 'none' : 'block' }}>Consult</Link>
-                </li>
-                <li onClick={() => setSelected('profile')}>
-                    <FontAwesomeIcon icon={faUser } style={{ marginRight: '10px', display: isCollapsed ? 'none' : 'block' }} />
-                    <Link style={{ display: isCollapsed ? 'none' : 'block' }}>Profile</Link>
-                </li> */}
-            </ul>
+        <div style={{ 
+            width: '250px', 
+            minHeight: '100vh', 
+            padding: '20px',
+            backgroundColor: 'var(--primary-color)',
+            color: 'white'
+        }}>
+            <h3 className="mb-4">Instructor Panel</h3>
+            <div className="d-flex flex-column gap-2">
+                {menuItems.map(item => (
+                    <button 
+                        key={item.id}
+                        className="btn btn-outline-light text-start"
+                        onClick={() => setSelected(item.id)}
+                    >
+                        <span className="me-2">{item.icon}</span>
+                        {item.label}
+                    </button>
+                ))}
+            </div>
         </div>
     );
-};
+}
 
 export default Sidebar;

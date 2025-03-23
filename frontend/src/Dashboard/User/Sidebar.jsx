@@ -19,9 +19,9 @@ const Sidebar = ({ setSelected }) => {
             </button>
             <h3 style={{ display: isCollapsed ? 'none' : 'block' }}>Dashboard</h3>
             <ul>
-                <li onClick={() => setSelected('wishlist')}>
+                <li onClick={() => setSelected('event')}>
                     <FontAwesomeIcon icon={faHeart} style={{ marginRight: '10px', display: isCollapsed ? 'none' : 'block' }} />
-                    <Link  style={{ display: isCollapsed ? 'none' : 'block' }}>Wishlist</Link>
+                    <Link  style={{ display: isCollapsed ? 'none' : 'block' }}>Event</Link>
                 </li>
                 <li onClick={() => setSelected('order')}>
                     <FontAwesomeIcon icon={faCartShopping} style={{ marginRight: '10px', display: isCollapsed ? 'none' : 'block' }} />

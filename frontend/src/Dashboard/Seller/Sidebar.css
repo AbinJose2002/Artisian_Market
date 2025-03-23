@@ -1,57 +1,66 @@
 /* src/components/Sidebar.css */
 .sidebar {
-    height: 100vh;
-    display: flex;
-    flex-direction: column;
-    width: 200px;
-    border-right: 1px solid #ccc;
-    padding: 10px;
-    transition: width 0.3s;
-    background-color: #f8f9fa; /* Light background color */
+  background: #1a1c2a;
+  color: #e4e6f1;
+  padding: 1rem;
+  min-height: 100vh;
+  transition: all 0.3s ease;
+  width: 250px;
 }
 
 .sidebar.collapsed {
-    width: 60px;
+  width: 60px;
 }
 
 .sidebar h3 {
-    display: block;
-    margin: 0;
-    padding: 10px 0;
-    font-size: 1.5em;
+  margin-bottom: 2rem;
+  opacity: 1;
+  transition: opacity 0.3s ease;
 }
 
 .sidebar ul {
-    list-style-type: none;
-    padding: 0;
+  list-style: none;
+  padding: 0;
 }
 
 .sidebar li {
-    border-radius: 20px;
-    display: flex;
-    align-items: center;
-    padding: 25px 10px;
-    transition: background-color 0.3s;
+  padding: 0.8rem;
+  margin-bottom: 0.5rem;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  color: #e4e6f1;
+  background: rgba(255, 255, 255, 0.05);
 }
 
 .sidebar li:hover {
-    background-color: #e9ecef; /* Light hover effect */
+  background: #2d3247;
+  transform: translateX(5px);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
 }
 
 .sidebar a {
-    text-decoration: none;
-    color: #333; /* Dark text color */
-    flex-grow: 1; /* Allow link to take full width */
+  text-decoration: none;
+  color: #e4e6f1;
+  flex-grow: 1; /* Allow link to take full width */
 }
 
 .sidebar a:hover {
-    color: #007bff; /* Change color on hover */
+  color: #64ffda;
 }
 
 .toggle-button {
-    background: none;
-    border: none;
-    cursor: pointer;
-    margin-bottom: 10px;
-    font-size: 1.5em; /* Increase icon size */
+  background: transparent;
+  border: none;
+  color: #64ffda;
+  width: 100%;
+  text-align: right;
+  padding: 0.5rem;
+  cursor: pointer;
+  transition: transform 0.3s ease;
+}
+
+.toggle-button:hover {
+  transform: scale(1.1);
+  color: #7ee2ff;
 }

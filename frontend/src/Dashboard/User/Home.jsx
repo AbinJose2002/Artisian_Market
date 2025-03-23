@@ -2,6 +2,8 @@
 import React, { useEffect, useState } from 'react';
 import { Outlet } from 'react-router-dom';
 import Sidebar from './Sidebar';
+import Events from './Events';
+import OrderDetails from './OrderDetails'
 
 const Home = () => {
     const [selected, setSelected] = useState('case'); // Default selected link
@@ -16,10 +18,10 @@ const Home = () => {
                     {/* <h2>Selected: {selected}</h2> Display the selected link */}
                     {(() => {
     switch (selected) {
-        // case 'case':
-        //     return <Case />;  // Added return
-        // case 'profile':
-        //     return <Profile />;
+        case 'event':
+            return <Events />;  // Added return
+        case 'order':
+            return <OrderDetails />;
         // case 'payment':
         //     return <Payment />;
         // case 'document':

@@ -1,11 +1,13 @@
 import React, { useEffect, useState } from "react";
-import { useParams } from "react-router-dom";
+import { useParams, useNavigate } from "react-router-dom";
 import axios from "axios";
 
 const ArtDetails = () => {
   const { id } = useParams();
+  const navigate = useNavigate();
   const [art, setArt] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [message, setMessage] = useState(null);
 
   useEffect(() => {
     const fetchArtDetails = async () => {
@@ -23,27 +25,83 @@ const ArtDetails = () => {
     fetchArtDetails();
   }, [id]);
 
+  const getToken = () => {
+    return (
+      localStorage.getItem('usertoken') || 
+      localStorage.getItem('sellertoken') || 
+      localStorage.getItem('instructortoken')
+    );
+  };
+
+  const handleAddToCart = async () => {
+    try {
+      const token = getToken();
+      if (!token) {
+        navigate('/user-login', { state: { from: `/art/${id}` } });
+        return;
+      }
+
+      const response = await axios.post(
+        'http://localhost:8080/product/cart/add',
+        { product_id: id },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+
+      if (response.data.success) {
+        setMessage({ type: 'success', text: response.data.message });
+      } else {
+        setMessage({ type: 'error', text: response.data.message });
+      }
+    } catch (error) {
+      console.error('Error adding to cart:', error);
+      setMessage({ 
+        type: 'error', 
+        text: error.response?.data?.message || 'Failed to add to cart' 
+      });
+    }
+  };
+
+  const handleAddToWishlist = async () => {
+    try {
+      const token = getToken();
+      if (!token) {
+        navigate('/login');
+        return;
+      }
+
+      const response = await axios.post(
+        'http://localhost:8080/product/wishlist/add',
+        { product_id: id },
+        { headers: { Authorization: `Bearer ${token}` }}
+      );
+
+      setMessage({ type: 'success', text: 'Added to wishlist successfully!' });
+    } catch (error) {
+      setMessage({ type: 'error', text: 'Failed to add to wishlist' });
+    }
+  };
+
   if (loading) return <p>Loading...</p>;
   if (!art) return <p>Art not found.</p>;
 
   return (
-    <div className="container mt-4">
-      <div className="row">
-        {/* Left: Product Image */}
-        <div className="col-md-5 text-center">
-          <img
-            src={art.image}
-            alt={art.name}
-            className="img-fluid rounded shadow"
-            style={{ maxHeight: "450px", objectFit: "cover" }}
-          />
-          <div className="mt-3">
-            <button className="btn btn-warning btn-lg me-3">Add to Cart</button>
-            <button className="btn btn-success btn-lg">Buy Now</button>
+    <div className="art-details-container">
+      {message && (
+        <div className={`alert ${message.type === 'success' ? 'alert-success' : 'alert-danger'}`}>
+          {message.text}
+        </div>
+      )}
+      <div className="row g-5">
+        <div className="col-md-5">
+          <div className="image-container">
+            <img src={art.image} alt={art.name} />
+          </div>
+          <div className="action-buttons">
+            <button className="btn-cart" onClick={handleAddToCart}>Add to Cart</button>
+            <button className="btn-buy">Buy Now</button>
           </div>
         </div>
 
-        {/* Right: Product Details */}
         <div className="col-md-7">
           <h2 className="fw-bold">{art.name}</h2>
           <p className="text-muted">Category: {art.category}</p>
@@ -92,10 +150,86 @@ const ArtDetails = () => {
 
           {/* Action Buttons */}
           <div className="mt-3">
-            <button className="btn btn-outline-primary btn-lg">Wishlist</button>
+            <button className="btn btn-outline-primary btn-lg" onClick={handleAddToWishlist}>
+              Wishlist
+            </button>
           </div>
         </div>
       </div>
+      
+      <style jsx>{`
+        .art-details-container {
+          max-width: 1200px;
+          margin: 2rem auto;
+          padding: 0 1rem;
+        }
+        
+        .image-container {
+          border-radius: 16px;
+          overflow: hidden;
+          box-shadow: 0 8px 16px rgba(0,0,0,0.1);
+          transition: transform 0.3s;
+        }
+        
+        .image-container:hover {
+          transform: scale(1.02);
+        }
+        
+        .image-container img {
+          width: 100%;
+          height: auto;
+          object-fit: cover;
+        }
+        
+        .action-buttons {
+          display: flex;
+          gap: 1rem;
+          margin-top: 2rem;
+        }
+        
+        .btn-cart, .btn-buy {
+          flex: 1;
+          padding: 1rem;
+          border: none;
+          border-radius: 8px;
+          font-weight: 600;
+          transition: transform 0.2s, box-shadow 0.2s;
+        }
+        
+        .btn-cart {
+          background: #f39c12;
+          color: white;
+        }
+        
+        .btn-buy {
+          background: #2ecc71;
+          color: white;
+        }
+        
+        .btn-cart:hover, .btn-buy:hover {
+          transform: translateY(-2px);
+          box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+        }
+        
+        h2 {
+          font-size: 2.5rem;
+          margin-bottom: 1rem;
+          color: #2c3e50;
+        }
+        
+        .price-tag {
+          font-size: 2rem;
+          color: #e74c3c;
+          font-weight: 700;
+        }
+        
+        .offers-section {
+          background: #f8f9fa;
+          padding: 1.5rem;
+          border-radius: 12px;
+          margin: 2rem 0;
+        }
+      `}</style>
     </div>
   );
 };

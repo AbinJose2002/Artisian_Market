@@ -3,7 +3,7 @@ from pathlib import Path
 from flask import Blueprint, request, jsonify, send_from_directory, url_for
 from werkzeug.utils import secure_filename
 from flask_jwt_extended import jwt_required, get_jwt_identity
-from app import product_collection
+from app import product_collection, users_collection
 from bson import ObjectId
 
 product_bp = Blueprint("product", __name__)
@@ -60,11 +60,20 @@ def add_product():
 @product_bp.route("/seller-list", methods=["GET"])
 @jwt_required()
 def get_seller_products():
-    seller_id = get_jwt_identity()  # ✅ Extract seller ID from 
-    # print(seller_id)
-    products = list(product_collection.find({"seller_id": seller_id}, {"_id": 0}))
+    try:
+        seller_id = get_jwt_identity()
+        if not seller_id:
+            return jsonify(success=False, message="Invalid token"), 401
 
-    return jsonify(success=True, products=products)
+        products = list(product_collection.find({"seller_id": seller_id}))
+        
+        # Include _id in response
+        for product in products:
+            product["_id"] = str(product["_id"])
+        
+        return jsonify(success=True, products=products)
+    except Exception as e:
+        return jsonify(success=False, message="Authentication failed"), 401
 
 @product_bp.route("/list", methods=["GET"])
 def get_products():
@@ -88,5 +97,225 @@ def get_product(art_id):
         product["_id"] = str(product["_id"])
 
         return jsonify(success=True, product=product)
+    except Exception as e:
+        return jsonify(success=False, message=str(e)), 500
+
+# 🔹 Update Product API
+@product_bp.route("/update/<product_id>", methods=["PUT"])
+@jwt_required()
+def update_product(product_id):
+    try:
+        seller_id = get_jwt_identity()
+        data = request.form
+        image = request.files.get("image")
+
+        # Verify product exists and belongs to seller
+        existing_product = product_collection.find_one({
+            "_id": ObjectId(product_id),
+            "seller_id": seller_id
+        })
+
+        if not existing_product:
+            return jsonify(success=False, message="Product not found or unauthorized"), 404
+
+        # Prepare update data
+        update_data = {
+            "name": data.get("name"),
+            "description": data.get("description"),
+            "price": data.get("price"),
+            "category": data.get("category")
+        }
+
+        # Handle image update if new image provided
+        if image:
+            filename = secure_filename(image.filename)
+            saved_path = os.path.join(UPLOAD_FOLDER, filename)
+            image.save(saved_path)
+            update_data["image"] = url_for("product.serve_image", filename=filename, _external=True)
+
+        # Update product
+        product_collection.update_one(
+            {"_id": ObjectId(product_id)},
+            {"$set": update_data}
+        )
+
+        return jsonify(success=True, message="Product updated successfully!")
+
+    except Exception as e:
+        return jsonify(success=False, message=str(e)), 500
+
+# 🔹 Delete Product API
+@product_bp.route("/delete/<product_id>", methods=["DELETE"])
+@jwt_required()
+def delete_product(product_id):
+    try:
+        seller_id = get_jwt_identity()
+
+        # Verify product exists and belongs to seller
+        result = product_collection.delete_one({
+            "_id": ObjectId(product_id),
+            "seller_id": seller_id
+        })
+
+        if result.deleted_count == 0:
+            return jsonify(success=False, message="Product not found or unauthorized"), 404
+
+        return jsonify(success=True, message="Product deleted successfully!")
+
+    except Exception as e:
+        return jsonify(success=False, message=str(e)), 500
+
+@product_bp.route("/cart/add", methods=["POST"])
+@jwt_required()
+def add_to_cart():
+    try:
+        user_email = get_jwt_identity()
+        product_id = request.json.get("product_id")
+        
+        if not product_id:
+            return jsonify(success=False, message="Product ID is required"), 400
+            
+        # Check if product exists
+        product = product_collection.find_one({"_id": ObjectId(product_id)})
+        if not product:
+            return jsonify(success=False, message="Product not found"), 404
+
+        # Initialize cart if it doesn't exist
+        result = users_collection.update_one(
+            {"email": user_email},
+            {"$addToSet": {"cart": ObjectId(product_id)}},
+            upsert=True
+        )
+
+        if result.modified_count > 0 or result.upserted_id:
+            return jsonify(success=True, message="Added to cart successfully")
+        return jsonify(success=False, message="Item already in cart"), 200
+
+    except Exception as e:
+        print(f"Error adding to cart: {str(e)}")
+        return jsonify(success=False, message=str(e)), 500
+
+@product_bp.route("/wishlist/add", methods=["POST"])
+@jwt_required()
+def add_to_wishlist():
+    try:
+        user_email = get_jwt_identity()
+        product_id = request.json.get("product_id")
+        
+        if not product_id:
+            return jsonify(success=False, message="Product ID is required"), 400
+            
+        print(f"Adding product {product_id} to wishlist for user {user_email}")  # Debug log
+        
+        # Check if product exists
+        product = product_collection.find_one({"_id": ObjectId(product_id)})
+        if not product:
+            return jsonify(success=False, message="Product not found"), 404
+            
+        # Find user and update wishlist
+        user = users_collection.find_one({"email": user_email})
+        if not user:
+            return jsonify(success=False, message="User not found"), 404
+            
+        # Update wishlist
+        result = users_collection.update_one(
+            {"email": user_email},
+            {"$addToSet": {"wishlist": ObjectId(product_id)}}
+        )
+        
+        if result.modified_count > 0 or result.matched_count > 0:
+            return jsonify(success=True, message="Added to wishlist successfully!")
+        else:
+            return jsonify(success=False, message="Failed to update wishlist"), 500
+            
+    except Exception as e:
+        print(f"Error adding to wishlist: {str(e)}")  # Debug log
+        return jsonify(success=False, message=f"An error occurred: {str(e)}"), 500
+
+@product_bp.route("/wishlist", methods=["GET"])
+@jwt_required()
+def get_wishlist():
+    try:
+        user_email = get_jwt_identity()
+        user = users_collection.find_one({"email": user_email})
+        
+        if not user or "wishlist" not in user:
+            return jsonify(success=True, items=[])
+            
+        # Fetch all products in the wishlist
+        wishlist_items = list(product_collection.find({"_id": {"$in": user["wishlist"]}}))
+        
+        # Convert ObjectIds to strings
+        for item in wishlist_items:
+            item["_id"] = str(item["_id"])
+            
+        return jsonify(success=True, items=wishlist_items)
+    except Exception as e:
+        print(f"Error fetching wishlist: {str(e)}")
+        return jsonify(success=False, message=str(e)), 500
+
+@product_bp.route("/wishlist/remove/<product_id>", methods=["DELETE"])
+@jwt_required()
+def remove_from_wishlist(product_id):
+    try:
+        user_email = get_jwt_identity()
+        result = users_collection.update_one(
+            {"email": user_email},
+            {"$pull": {"wishlist": ObjectId(product_id)}}
+        )
+        
+        if result.modified_count > 0:
+            return jsonify(success=True, message="Item removed from wishlist")
+        return jsonify(success=False, message="Item not found in wishlist"), 404
+    except Exception as e:
+        return jsonify(success=False, message=str(e)), 500
+
+@product_bp.route("/cart", methods=["GET"])
+@jwt_required()
+def get_cart():
+    try:
+        user_email = get_jwt_identity()
+        if not user_email:
+            return jsonify(success=False, message="Invalid token"), 401
+
+        # Find user and ensure cart exists
+        user = users_collection.find_one({"email": user_email})
+        if not user:
+            return jsonify(success=False, message="User not found"), 404
+
+        # Initialize cart if it doesn't exist
+        if "cart" not in user:
+            users_collection.update_one(
+                {"email": user_email},
+                {"$set": {"cart": []}}
+            )
+            return jsonify(success=True, items=[])
+
+        # Get cart items
+        cart_items = []
+        if user.get("cart"):
+            cart_items = list(product_collection.find({"_id": {"$in": user["cart"]}}))
+            for item in cart_items:
+                item["_id"] = str(item["_id"])
+
+        return jsonify(success=True, items=cart_items)
+
+    except Exception as e:
+        print(f"Cart error: {str(e)}")
+        return jsonify(success=False, message=str(e)), 500
+
+@product_bp.route("/cart/remove/<product_id>", methods=["DELETE"])
+@jwt_required()
+def remove_from_cart(product_id):
+    try:
+        user_email = get_jwt_identity()
+        result = users_collection.update_one(
+            {"email": user_email},
+            {"$pull": {"cart": ObjectId(product_id)}}
+        )
+        
+        if result.modified_count > 0:
+            return jsonify(success=True, message="Item removed from cart")
+        return jsonify(success=False, message="Item not found in cart"), 404
     except Exception as e:
         return jsonify(success=False, message=str(e)), 500
