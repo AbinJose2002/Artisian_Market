@@ -31,8 +31,9 @@ def add_product():
     description = data.get("description")
     price = data.get("price")
     category = data.get("category")
+    quantity = data.get("quantity")
 
-    if not all([name, description, price, category]):
+    if not all([name, description, price, category, quantity]):
         return jsonify(success=False, message="All fields are required"), 400
 
     image_url = None
@@ -50,11 +51,50 @@ def add_product():
         "description": description,
         "price": price,
         "category": category,
+        "quantity": int(quantity),  # Add quantity
         "image": image_url
     }
     product_collection.insert_one(product)
 
     return jsonify(success=True, message="Product added successfully!", image_url=image_url)
+
+# 🔹 Verify Stock API
+@product_bp.route("/verify/stock", methods=["POST"])
+@jwt_required()
+def verify_stock():
+    try:
+        product_id = request.json.get("product_id")
+        quantity_requested = request.json.get("quantity", 1)
+        
+        product = product_collection.find_one({"_id": ObjectId(product_id)})
+        if not product:
+            return jsonify(success=False, message="Product not found"), 404
+            
+        if product["quantity"] < quantity_requested:
+            return jsonify(success=False, message="Insufficient stock"), 400
+            
+        return jsonify(success=True, available=True)
+    except Exception as e:
+        return jsonify(success=False, message=str(e)), 500
+
+# 🔹 Update Stock API
+@product_bp.route("/update/stock", methods=["PUT"])
+@jwt_required()
+def update_stock():
+    try:
+        product_id = request.json.get("product_id")
+        quantity_purchased = request.json.get("quantity", 1)
+        
+        result = product_collection.update_one(
+            {"_id": ObjectId(product_id)},
+            {"$inc": {"quantity": -quantity_purchased}}
+        )
+        
+        if result.modified_count:
+            return jsonify(success=True, message="Stock updated")
+        return jsonify(success=False, message="Failed to update stock"), 400
+    except Exception as e:
+        return jsonify(success=False, message=str(e)), 500
 
 # 🔹 Get Products for a Specific Seller (Authenticated)
 @product_bp.route("/seller-list", methods=["GET"])
@@ -123,7 +163,8 @@ def update_product(product_id):
             "name": data.get("name"),
             "description": data.get("description"),
             "price": data.get("price"),
-            "category": data.get("category")
+            "category": data.get("category"),
+            "quantity": int(data.get("quantity")) if data.get("quantity") else existing_product["quantity"]
         }
 
         # Handle image update if new image provided

@@ -25,7 +25,17 @@ const Events = () => {
         const fetchEvents = async () => {
             try {
                 const res = await axios.get("http://localhost:8080/instructor/events/list");
-                setEvents(res.data.events);
+                
+                // Filter out past events
+                const today = new Date();
+                today.setHours(0, 0, 0, 0); // Reset time to start of day
+                
+                const upcomingEvents = res.data.events.filter(event => {
+                    const eventDate = new Date(event.date);
+                    return eventDate >= today;
+                }).sort((a, b) => new Date(a.date) - new Date(b.date)); // Sort by date
+
+                setEvents(upcomingEvents);
             } catch (err) {
                 console.error("Error fetching events:", err);
                 setError("Failed to load events");

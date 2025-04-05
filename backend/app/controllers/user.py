@@ -1,9 +1,10 @@
 import os
 from flask import Blueprint, request, jsonify
 from flask_bcrypt import Bcrypt
-from flask_jwt_extended import create_access_token
+from flask_jwt_extended import create_access_token, jwt_required, get_jwt_identity
 from werkzeug.utils import secure_filename
-from app import users_collection, bcrypt
+from bson import ObjectId
+from app import users_collection, bcrypt, product_collection
 
 user_bp = Blueprint('user', __name__)
 
@@ -76,3 +77,61 @@ def login():
         return jsonify(success=True, token=access_token, profile_photo=user.get("profile_photo"))
 
     return jsonify(success=False, message="Invalid credentials"), 401
+
+@user_bp.route('/cart', methods=['GET'])
+@jwt_required()
+def get_cart():
+    try:
+        user_email = get_jwt_identity()
+        user = users_collection.find_one({'email': user_email})
+        
+        if not user:
+            return jsonify(success=False, message="User not found"), 404
+        
+        # Return cart items if they exist, or empty array
+        cart_ids = user.get('cart', [])
+        cart_items = []
+        
+        if cart_ids:
+            # Get product details for cart items
+            cart_items = list(product_collection.find({'_id': {'$in': cart_ids}}))
+            # Convert ObjectIds to strings
+            for item in cart_items:
+                item['_id'] = str(item['_id'])
+                if 'seller_id' in item and isinstance(item['seller_id'], ObjectId):
+                    item['seller_id'] = str(item['seller_id'])
+        
+        return jsonify(success=True, items=cart_items)
+    
+    except Exception as e:
+        print(f"Error getting cart: {str(e)}")
+        return jsonify(success=False, message=str(e)), 500
+
+@user_bp.route('/wishlist', methods=['GET'])
+@jwt_required()
+def get_wishlist():
+    try:
+        user_email = get_jwt_identity()
+        user = users_collection.find_one({'email': user_email})
+        
+        if not user:
+            return jsonify(success=False, message="User not found"), 404
+        
+        # Return wishlist items if they exist, or empty array
+        wishlist_ids = user.get('wishlist', [])
+        wishlist_items = []
+        
+        if wishlist_ids:
+            # Get product details for wishlist items
+            wishlist_items = list(product_collection.find({'_id': {'$in': wishlist_ids}}))
+            # Convert ObjectIds to strings
+            for item in wishlist_items:
+                item['_id'] = str(item['_id'])
+                if 'seller_id' in item and isinstance(item['seller_id'], ObjectId):
+                    item['seller_id'] = str(item['seller_id'])
+        
+        return jsonify(success=True, items=wishlist_items)
+    
+    except Exception as e:
+        print(f"Error getting wishlist: {str(e)}")
+        return jsonify(success=False, message=str(e)), 500

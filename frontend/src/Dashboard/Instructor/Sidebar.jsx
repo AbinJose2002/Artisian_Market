@@ -6,6 +6,8 @@ function Sidebar({ setSelected }) {
         { id: 'events', label: 'Manage Events', icon: '📅' },
         { id: 'participants', label: 'Participants', icon: '👥' },
         { id: 'earnings', label: 'Earnings', icon: '💰' },
+        { id: 'bids', label: 'Manage Bids', icon: '🔨' },
+        { id: 'mybids', label: 'My Bid History', icon: '📊' },
         { id: 'profile', label: 'Profile', icon: '⚙️' }
     ];
 

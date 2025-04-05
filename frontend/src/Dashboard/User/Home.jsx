@@ -1,42 +1,45 @@
 // src/components/Dashboard.js
-import React, { useEffect, useState } from 'react';
+import React, { useState } from 'react';
 import { Outlet } from 'react-router-dom';
-import Sidebar from './Sidebar';
+import UserSidebar from './UserSidebar';
+import UserDashboard from './UserDashboard';
+import OrderDetails from './OrderDetails';
+import Reviews from './Reviews';
+import MyReviews from './MyReviews';
 import Events from './Events';
-import OrderDetails from './OrderDetails'
+import UserBids from './UserBids'; // Add this import
 
-const Home = () => {
-    const [selected, setSelected] = useState('case'); // Default selected link
-    
-    
+function Home() {
+    const [selected, setSelected] = useState('dashboard');
+
+    const renderContent = () => {
+        switch(selected) {
+            case 'dashboard':
+                return <UserDashboard />;
+            case 'orders':
+                return <OrderDetails />;
+            case 'events':
+                return <Events />;
+            case 'bids': // Add this case
+                return <UserBids />;
+            case 'reviews':
+                return <Reviews />;
+            case 'myreviews':
+                return <MyReviews />;
+            default:
+                return <UserDashboard />;
+        }
+    };
+
     return (
-        <>
-            {/* <Navbar /> */}
-            <div style={{ display: 'flex' }}>
-                <Sidebar setSelected={setSelected} />
-                <div style={{ padding: '20px', flex: 1 }}>
-                    {/* <h2>Selected: {selected}</h2> Display the selected link */}
-                    {(() => {
-    switch (selected) {
-        case 'event':
-            return <Events />;  // Added return
-        case 'order':
-            return <OrderDetails />;
-        // case 'payment':
-        //     return <Payment />;
-        // case 'document':
-        //     return <Document />;
-        // case 'consult':
-        //     return <Consultation />;
-        // default:
-        //     return <Case />;
-    }
-})()}
-                    <Outlet />
-                </div>
+        <div style={{ display: 'flex' }}>
+            <UserSidebar setSelected={setSelected} />
+            <div style={{ padding: '20px', flex: 1 }}>
+                {renderContent()}
+                <Outlet />
             </div>
-        </>
+        </div>
     );
-};
+}
 
 export default Home;

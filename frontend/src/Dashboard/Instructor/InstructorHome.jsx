@@ -6,6 +6,8 @@ import EventManager from './EventManager';
 import EventParticipants from './EventParticipants';
 import Earnings from './Earnings';
 import Profile from './Profile';
+import BidManager from './BidManager';
+import MyBids from './MyBids'; // Add this import
 
 function InstructorHome() {
     const [selected, setSelected] = useState('events');
@@ -47,6 +49,10 @@ function InstructorHome() {
                 return <Profile />;
             case 'earnings':
                 return <Earnings />;
+            case 'bids':
+                return <BidManager />;
+            case 'mybids':
+                return <MyBids />;
             default:
                 return <EventManager onSelectEvent={handleEventSelect} />;
         }

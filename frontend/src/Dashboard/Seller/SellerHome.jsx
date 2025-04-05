@@ -2,22 +2,44 @@
 import React, { useState } from 'react';
 import { Outlet } from 'react-router-dom';
 import Sidebar from './Sidebar';
-import Orders from './Orders';
 import AddProduct from './AddProduct';
+import Orders from './Orders';
+import SellerProfile from './SellerProfile';
+import SellerDashboard from './SellerDashboard';
+import SellerBids from './SellerBids';
+import SellerBidRequests from './SellerBidRequests';
 
-const SellerHome = () => {
-    const [selected, setSelected] = useState('products');
+function SellerHome() {
+    const [selected, setSelected] = useState('dashboard');
+
+    const renderContent = () => {
+        switch(selected) {
+            case 'dashboard':
+                return <SellerDashboard />;
+            case 'products':
+                return <AddProduct />;
+            case 'orders':
+                return <Orders />;
+            case 'bids':
+                return <SellerBids />;
+            case 'bidrequests':
+                return <SellerBidRequests />;
+            case 'profile':
+                return <SellerProfile />;
+            default:
+                return <SellerDashboard />;
+        }
+    };
 
     return (
         <div style={{ display: 'flex' }}>
             <Sidebar setSelected={setSelected} />
             <div style={{ padding: '20px', flex: 1 }}>
-                {selected === 'orders' && <Orders />}
-                {selected === 'products' && <AddProduct />}
+                {renderContent()}
                 <Outlet />
             </div>
         </div>
     );
-};
+}
 
 export default SellerHome;

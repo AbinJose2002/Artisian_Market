@@ -19,17 +19,28 @@ function ArtItems({ items }) {
       <div className="row g-4">
         {displayedItems.map((item) => (
           <div key={item.id} className="col-md-3 col-sm-6">
-            <div 
-              className="art-card h-100"
-              onClick={() => handleArtClick(item.id)}
-            >
-              <div className="card-img-wrapper">
+            <div className="art-card h-100">
+              <div className="card-img-wrapper position-relative">
                 <img src={item.image} alt={item.name} />
+                {item.quantity <= 0 && (
+                  <div className="out-of-stock-overlay">
+                    Out of Stock
+                  </div>
+                )}
               </div>
               <div className="card-content">
                 <h5>{item.name}</h5>
                 <p className="price">₹{item.price}</p>
-                <button className="view-btn">View Details</button>
+                <p className={`stock ${item.quantity <= 0 ? 'text-danger' : 'text-success'}`}>
+                  {item.quantity <= 0 ? 'Out of Stock' : `In Stock: ${item.quantity}`}
+                </p>
+                <button 
+                  className={`view-btn ${item.quantity <= 0 ? 'disabled' : ''}`}
+                  onClick={() => item.quantity > 0 && handleArtClick(item.id)}
+                  disabled={item.quantity <= 0}
+                >
+                  {item.quantity <= 0 ? 'Out of Stock' : 'View Details'}
+                </button>
               </div>
             </div>
           </div>
@@ -63,6 +74,7 @@ function ArtItems({ items }) {
         .card-img-wrapper {
           height: 250px;
           overflow: hidden;
+          position: relative;
         }
         
         .card-img-wrapper img {
@@ -74,6 +86,21 @@ function ArtItems({ items }) {
         
         .art-card:hover .card-img-wrapper img {
           transform: scale(1.05);
+        }
+        
+        .out-of-stock-overlay {
+          position: absolute;
+          top: 0;
+          left: 0;
+          right: 0;
+          bottom: 0;
+          background: rgba(0,0,0,0.7);
+          color: white;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          font-size: 1.2rem;
+          font-weight: bold;
         }
         
         .card-content {
@@ -88,6 +115,13 @@ function ArtItems({ items }) {
           margin: 0.5rem 0;
         }
         
+        .stock {
+          font-size: 1rem;
+          margin: 0.5rem 0;
+          font-weight: 500;
+          margin-bottom: 10px;
+        }
+        
         .view-btn {
           background: #3498db;
           color: white;
@@ -99,6 +133,12 @@ function ArtItems({ items }) {
         
         .view-btn:hover {
           background: #2980b9;
+        }
+        
+        .view-btn.disabled {
+          background: #ccc;
+          cursor: not-allowed;
+          opacity: 0.7;
         }
       `}</style>
     </div>

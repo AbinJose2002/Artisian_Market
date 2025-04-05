@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { loadStripe } from '@stripe/stripe-js';
+import { toast } from 'react-toastify';
 
 const stripePromise = loadStripe('pk_test_51Pf271RrUp4W2KP556GuzSY5xDEQOiH0FdTiNpHsBByUhWgscyRiBbXqpK0dr0S0ShP71FFOKl4oddnXGhBDqRly00ekAPON9R');
 
@@ -40,8 +41,36 @@ const Cart = () => {
         }
     };
 
+    const verifyStock = async (items) => {
+        try {
+            const token = localStorage.getItem('usertoken');
+            for (let item of items) {
+                const response = await axios.post(
+                    'http://localhost:8080/product/verify/stock',
+                    { product_id: item._id },
+                    { headers: { Authorization: `Bearer ${token}` } }
+                );
+                if (!response.data.available) {
+                    toast.error(`${item.name} is out of stock!`);
+                    return false;
+                }
+            }
+            return true;
+        } catch (error) {
+            console.error('Stock verification error:', error);
+            toast.error('Error verifying stock availability');
+            return false;
+        }
+    };
+
     const handleCheckout = async () => {
         try {
+            // Verify stock before checkout
+            const stockAvailable = await verifyStock(cartItems);
+            if (!stockAvailable) {
+                return;
+            }
+
             const token = localStorage.getItem('usertoken');
             const response = await axios.post(
                 'http://localhost:8080/payment/create-cart-session',
@@ -55,6 +84,7 @@ const Cart = () => {
             });
         } catch (error) {
             console.error('Checkout error:', error);
+            toast.error('Checkout failed. Please try again.');
         }
     };
 

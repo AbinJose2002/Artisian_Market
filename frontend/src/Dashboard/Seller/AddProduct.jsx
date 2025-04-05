@@ -13,6 +13,7 @@ const AddProduct = () => {
         price: "",
         category: "Painting", // Default category
         image: null,
+        quantity: "",
     });
     const [isEditing, setIsEditing] = useState(false);
     const [editingProductId, setEditingProductId] = useState(null);
@@ -83,7 +84,8 @@ const AddProduct = () => {
             description: product.description,
             price: product.price,
             category: product.category,
-            image: product.image
+            image: product.image,
+            quantity: product.quantity,
         });
         setEditingProductId(product._id);
         setIsEditing(true);
@@ -120,6 +122,7 @@ const AddProduct = () => {
         formData.append("price", productData.price);
         formData.append("category", productData.category);
         formData.append("image", productData.image);
+        formData.append("quantity", productData.quantity);
 
         try {
             if (isEditing) {
@@ -136,7 +139,7 @@ const AddProduct = () => {
             setShowModal(false);
             setIsEditing(false);
             setEditingProductId(null);
-            setProductData({ name: "", description: "", price: "", category: "Painting", image: null });
+            setProductData({ name: "", description: "", price: "", category: "Painting", image: null, quantity: "" });
             fetchSellerProducts();
         } catch (error) {
             console.error("Error saving product:", error);
@@ -209,6 +212,19 @@ const AddProduct = () => {
                                     name="image"
                                     onChange={handleImageChange}
                                 />
+
+                                <div className="mb-3">
+                                    <label className="form-label">Quantity in Stock</label>
+                                    <input
+                                        type="number"
+                                        name="quantity"
+                                        className="form-control"
+                                        value={productData.quantity}
+                                        onChange={handleChange}
+                                        required
+                                        min="0"
+                                    />
+                                </div>
                             </div>
                             <div className="modal-footer">
                                 <button className="btn btn-secondary" onClick={() => setShowModal(false)}>Cancel</button>
@@ -262,6 +278,7 @@ const AddProduct = () => {
                                     <p className="card-text">{product.description}</p>
                                     <p className="text-primary fw-bold">₹{product.price}</p>
                                     <p className="text-muted">Category: {product.category}</p>
+                                    <p className="text-muted">Quantity: {product.quantity}</p>
                                     <div className="d-flex justify-content-between mt-2">
                                         <button 
                                             className="btn btn-sm btn-outline-primary"

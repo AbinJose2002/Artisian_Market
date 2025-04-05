@@ -6,11 +6,20 @@ from werkzeug.utils import secure_filename
 import os
 import uuid
 from bson.objectid import ObjectId
+from bson import ObjectId
+import datetime
+import time
+from datetime import datetime  # Import datetime class from the datetime module
+from flask import current_app
 from app import (
     events_collection,
     instructor_collection,
-    users_collection  # Add users_collection import
+    users_collection,  # Add users_collection import
+    db
 )
+
+# Add new collection for bids
+bids_collection = db.get_collection("bids")
 
 # Create the blueprint
 instructor_bp = Blueprint('instructor', __name__)
@@ -441,26 +450,239 @@ def update_profile():
 @jwt_required()
 def get_event_details(event_id):
     try:
+        user_email = get_jwt_identity()
+        
+        # Find event and check if user is registered
+        event = events_collection.find_one({'_id': ObjectId(event_id)})
+        if not event:
+            return jsonify(success=False, message="Event not found"), 404
+            
+        # Convert ObjectId to string for JSON serialization
+        event['_id'] = str(event['_id'])
+        event['instructor_id'] = str(event['instructor_id'])
+        
+        # Format date fields
+        if 'date' in event:
+            event['date'] = event['date'].isoformat() if isinstance(event['date'], datetime) else event['date']
+            
+        # Find user registration details
+        registration_details = None
+        if 'registered_users' in event:
+            for user in event['registered_users']:
+                if user.get('user_id') == user_email:
+                    registration_details = user
+                    # Convert date fields
+                    if 'payment_date' in registration_details and isinstance(registration_details['payment_date'], datetime):
+                        registration_details['payment_date'] = registration_details['payment_date'].isoformat()
+                    break
+            
+        # Remove registered_users list from response for privacy
+        if 'registered_users' in event:
+            del event['registered_users']
+            
+        # Add registration status
+        event['registration_details'] = registration_details
+            
+        return jsonify(success=True, event=event)
+        
+    except Exception as e:
+        print(f"Error fetching event details: {str(e)}")
+        return jsonify(success=False, message=str(e)), 500
+
+@instructor_bp.route('/bids/create', methods=['POST'])
+@jwt_required()
+def create_bid():
+    try:
         instructor_email = get_jwt_identity()
         instructor = instructor_collection.find_one({"email": instructor_email})
         
         if not instructor:
             return jsonify(success=False, message="Instructor not found"), 404
 
-        event = events_collection.find_one({
-            "_id": ObjectId(event_id),
-            "instructor_id": instructor["_id"]
+        # Extract data from form
+        data = request.form
+        image = request.files.get('image')
+        
+        # Validate required fields
+        required_fields = ['title', 'description', 'baseAmount', 'lastDate', 'minBidIncrement']
+        if not all(data.get(field) for field in required_fields):
+            return jsonify(success=False, message="Missing required fields"), 400
+
+        # Handle image upload
+        image_filename = None
+        if image:
+            image_filename = save_file(image, UPLOAD_FOLDER_POSTER)
+
+        # Create bid document
+        bid = {
+            'instructor_id': instructor['_id'],
+            'title': data['title'],
+            'description': data['description'],
+            'base_amount': float(data['baseAmount']),
+            'current_amount': float(data['baseAmount']),  # Initially same as base amount
+            'min_increment': float(data['minBidIncrement']),
+            'last_date': datetime.fromisoformat(data['lastDate'].replace('Z', '+00:00')),
+            'image': image_filename,
+            'category': data.get('category', 'Other'),
+            'condition': data.get('condition', 'New'),
+            'dimensions': data.get('dimensions'),
+            'material': data.get('material'),
+            'status': 'active',
+            'bids': [],  # Array to store bid history
+            'created_at': datetime.utcnow()
+        }
+
+        # Insert into database
+        result = bids_collection.insert_one(bid)
+
+        return jsonify({
+            'success': True,
+            'message': 'Bid created successfully',
+            'bid_id': str(result.inserted_id)
         })
 
-        if not event:
-            return jsonify(success=False, message="Event not found or unauthorized"), 404
-
-        # Convert ObjectId to string for JSON serialization
-        event['_id'] = str(event['_id'])
-        event['instructor_id'] = str(event['instructor_id'])
-
-        return jsonify(success=True, event=event)
-
     except Exception as e:
-        print(f"Error fetching event details: {str(e)}")
+        print(f"Error creating bid: {str(e)}")
+        return jsonify(success=False, message=str(e)), 500
+
+@instructor_bp.route('/bids', methods=['GET'])
+@jwt_required()
+def get_instructor_bids():
+    try:
+        instructor_email = get_jwt_identity()
+        instructor = instructor_collection.find_one({'email': instructor_email})
+        
+        if not instructor:
+            return jsonify(success=False, message="Instructor not found"), 404
+        
+        instructor_id = str(instructor['_id'])
+        
+        # Find all bids created by this instructor
+        bids = list(bids_collection.find({'instructor_id': instructor_id}))
+        
+        formatted_bids = []
+        for bid in bids:
+            formatted_bid = {
+                '_id': str(bid['_id']),
+                'title': bid.get('title', 'Untitled'),
+                'description': bid.get('description', ''),
+                'base_amount': float(bid.get('base_amount', 0)),
+                'current_amount': float(bid.get('current_amount', bid.get('base_amount', 0))),
+                'min_increment': float(bid.get('min_increment', 0)),
+                'category': bid.get('category', 'Other'),
+                'condition': bid.get('condition', ''),
+                'dimensions': bid.get('dimensions', ''),
+                'material': bid.get('material', ''),
+                'artistDetails': bid.get('artistDetails', ''),
+                'image': bid.get('image', ''),
+                'status': bid.get('status', 'pending'),
+                'created_at': bid.get('created_at').isoformat() if 'created_at' in bid else None,
+                'last_date': bid.get('last_date').isoformat() if 'last_date' in bid else None,
+                'bids': []
+            }
+            
+            # Format the bids array
+            if 'bids' in bid and bid['bids']:
+                for individual_bid in bid['bids']:
+                    formatted_individual_bid = {
+                        'user_email': individual_bid.get('user_email', 'Unknown'),
+                        'amount': float(individual_bid.get('amount', 0)),
+                        'timestamp': individual_bid.get('timestamp').isoformat() if 'timestamp' in individual_bid else None
+                    }
+                    formatted_bid['bids'].append(formatted_individual_bid)
+            
+            formatted_bids.append(formatted_bid)
+        
+        return jsonify(success=True, bids=formatted_bids)
+        
+    except Exception as e:
+        print(f"Error fetching instructor bids: {str(e)}")
+        return jsonify(success=False, message=str(e)), 500
+
+@instructor_bp.route('/bids/request', methods=['POST'])
+@jwt_required()
+def request_instructor_bid():
+    try:
+        instructor_email = get_jwt_identity()
+        instructor = instructor_collection.find_one({'email': instructor_email})
+        
+        if not instructor:
+            return jsonify(success=False, message="Instructor not found"), 404
+        
+        instructor_id = str(instructor['_id'])
+        
+        # Get form data
+        title = request.form.get('title')
+        description = request.form.get('description')
+        base_amount = float(request.form.get('baseAmount'))
+        min_increment = float(request.form.get('minBidIncrement'))
+        category = request.form.get('category')
+        condition = request.form.get('condition')
+        dimensions = request.form.get('dimensions')
+        material = request.form.get('material')
+        artist_details = request.form.get('artistDetails')
+        
+        # Fix the datetime parsing - use datetime directly, not datetime.datetime
+        last_date_str = request.form.get('lastDate')
+        if 'Z' in last_date_str:
+            last_date_str = last_date_str.replace('Z', '+00:00')
+        last_date = datetime.fromisoformat(last_date_str)
+        
+        # Validation
+        if not all([title, description, base_amount, min_increment, category, last_date]):
+            return jsonify(success=False, message="Missing required fields"), 400
+            
+        if last_date <= datetime.utcnow():
+            return jsonify(success=False, message="End date must be in the future"), 400
+        
+        # Process the image if provided
+        image_filename = None
+        if 'image' in request.files:
+            image = request.files['image']
+            if image.filename:
+                # Create safe filename
+                ext = image.filename.rsplit('.', 1)[1].lower() if '.' in image.filename else 'jpg'
+                image_filename = f"bid_instructor_{instructor_id}_{int(time.time())}.{ext}"
+                
+                # Save the image
+                upload_folder = current_app.config['UPLOAD_FOLDERS']['event_posters']
+                image_path = os.path.join(upload_folder, image_filename)
+                image.save(image_path)
+                print(f"Image saved at: {image_path}")
+        
+        # Create bid request document
+        bid_request = {
+            'title': title,
+            'description': description,
+            'base_amount': base_amount,
+            'min_increment': min_increment,
+            'current_amount': base_amount,  # Initially set to base amount
+            'category': category,
+            'condition': condition,
+            'dimensions': dimensions,
+            'material': material,
+            'artistDetails': artist_details,
+            'last_date': last_date,
+            'image': image_filename,
+            'instructor_id': instructor_id,
+            'instructor_name': f"{instructor.get('first_name', '')} {instructor.get('last_name', '')}",
+            'instructor_email': instructor_email,
+            'status': 'pending',  # Initial status is pending admin approval
+            'created_at': datetime.utcnow(),
+            'bids': []  # No bids initially
+        }
+        
+        # Insert into database
+        result = bids_collection.insert_one(bid_request)
+        
+        return jsonify({
+            'success': True,
+            'message': 'Auction request submitted successfully for review',
+            'bid_id': str(result.inserted_id)
+        })
+        
+    except Exception as e:
+        print(f"Error creating instructor bid request: {str(e)}")
+        import traceback
+        print(traceback.format_exc())  # Print full traceback for debugging
         return jsonify(success=False, message=str(e)), 500

@@ -18,6 +18,11 @@ import WishList from './Pages/WishList'
 import Events from './Pages/Events'
 import PaymentSuccess from './Pages/PaymentSuccess'
 import Cart from './Pages/Cart'
+import AdminLogin from "./Auth/Admin/AdminLogin";
+import AdminRegister from "./Auth/Admin/AdminRegister";
+import AdminHome from './Dashboard/Admin/AdminHome';
+import Bids from './Pages/Bids';
+import Contact from './Home/Contact'
 
 export default function App() {
   return (
@@ -32,6 +37,8 @@ export default function App() {
           <Route path="/art/:id" element={<ArtDetails />} />
           <Route path="/events" element={<Events />} />
           <Route path='/cart' element={<Cart />}></Route>
+          <Route path="/bids" element={<Bids />} />
+          <Route path="/contact" element={<Contact />} />
 
           {/* User Routes */}
           <Route path="/user-register" element={<UserRegister />} />
@@ -47,6 +54,11 @@ export default function App() {
           <Route path="/seller-register" element={<SellerRegister />} />
           <Route path="/seller-login" element={<SellerLogin />} />
           <Route path="/seller-dashboard" element={<SellerHome />} />
+
+          {/* Admin Routes */}
+          <Route path="/admin-login" element={<AdminLogin />} />
+          <Route path="/admin-register" element={<AdminRegister />} />
+          <Route path="/admin-dashboard" element={<AdminHome />} />
 
           {/* Payment Routes */}
           <Route path="/payment/success" element={<PaymentSuccess />} />

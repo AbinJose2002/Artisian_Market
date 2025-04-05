@@ -20,6 +20,8 @@ events_collection = db.get_collection("events")
 seller_collection = db.get_collection("seller") 
 product_collection = db.get_collection("product") 
 orders_collection = db.get_collection("orders")
+admin_collection = db.get_collection("admin")
+bids_collection = db.get_collection("bids")  # Add bids collection
 
 def create_app():
     # Configure static file serving
@@ -61,25 +63,32 @@ def create_app():
     from app.controllers.home import home_bp
     from app.controllers.user import user_bp
     from app.controllers.instructor import instructor_bp
-    from app.controllers.seller import seller_bp
+    from app.controllers.seller import seller_bp  # Make sure this import exists
     from app.controllers.product import product_bp
-    from app.controllers.payment import payment_bp  # Add this import
+    from app.controllers.payment import payment_bp
     from app.controllers.order import order_bp
-
+    from app.controllers.admin import admin_bp
+    from app.controllers.bids import bids_bp
+    from app.controllers.reviews import reviews_bp
+    
     app.register_blueprint(home_bp)
     app.register_blueprint(user_bp, url_prefix='/user')
+    app.register_blueprint(seller_bp, url_prefix='/seller')  # Make sure this line exists
     app.register_blueprint(instructor_bp, url_prefix='/instructor')
-    app.register_blueprint(seller_bp, url_prefix='/seller')
+    app.register_blueprint(admin_bp, url_prefix='/admin')
     app.register_blueprint(product_bp, url_prefix='/product')
-    app.register_blueprint(payment_bp, url_prefix='/payment')  # Add this line
+    app.register_blueprint(bids_bp, url_prefix='/bids')
+    app.register_blueprint(payment_bp, url_prefix='/payment')
     app.register_blueprint(order_bp, url_prefix='/order')
+    app.register_blueprint(reviews_bp, url_prefix='/reviews')
     
-    # Update CORS configuration
+    # Update CORS configuration to be more permissive during development
     CORS(app, resources={
         r"/*": {
             "origins": ["http://localhost:5173"],
-            "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-            "allow_headers": ["Content-Type", "Authorization"]
+            "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],
+            "allow_headers": ["Content-Type", "Authorization", "Accept"],
+            "supports_credentials": True
         }
     })
 

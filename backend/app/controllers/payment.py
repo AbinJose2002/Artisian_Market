@@ -67,7 +67,7 @@ def create_checkout_session():
 def verify_payment():
     try:
         session_id = request.json.get('sessionId')
-        payment_type = request.json.get('type', 'event')  # 'event' or 'cart'
+        payment_type = request.json.get('type', 'event')
         
         if not session_id:
             return jsonify({"success": False, "error": "Session ID required"}), 400
@@ -81,6 +81,20 @@ def verify_payment():
                 # Create order from cart items
                 user = users_collection.find_one({"email": user_email})
                 cart_items = list(product_collection.find({"_id": {"$in": user.get('cart', [])}}))
+
+                # Check and update product quantities
+                for item in cart_items:
+                    if item['quantity'] < 1:
+                        return jsonify({
+                            "success": False, 
+                            "error": f"Product {item['name']} is out of stock"
+                        }), 400
+
+                    # Decrease quantity
+                    product_collection.update_one(
+                        {"_id": item['_id']},
+                        {"$inc": {"quantity": -1}}
+                    )
                 
                 order = {
                     'user_email': user_email,
@@ -88,8 +102,8 @@ def verify_payment():
                         'id': str(item['_id']),
                         'name': item['name'],
                         'price': item['price'],
-                        'image': item['image'],
-                        'seller_id': item['seller_id'],
+                        'image': item.get('image', ''),
+                        'seller_id': str(item.get('seller_id', '')),  # Convert ObjectId to string and handle missing seller_id
                         'quantity': 1
                     } for item in cart_items],
                     'total_amount': sum(float(item['price']) for item in cart_items),
@@ -105,6 +119,8 @@ def verify_payment():
                     {"email": user_email},
                     {"$set": {"cart": []}}
                 )
+                
+                print(f"Created order for user {user_email} with {len(cart_items)} items")
                 
             else:  # Event registration
                 # Check if already registered
