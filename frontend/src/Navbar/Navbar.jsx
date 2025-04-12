@@ -22,6 +22,7 @@ const Navbar = () => {
     localStorage.clear();
     setRole(null);
     navigate("/");
+    window.location.reload(); // Reload the page to reflect the logout state
   };
 
   return (
@@ -61,16 +62,16 @@ const Navbar = () => {
       </div>
 
       <div className="d-flex align-items-center">
-        <Link className="nav-link me-3 cart-icon" to="/cart">
+        <Link className="nav-link me-3 cart-icon text-white" to="/cart">
           <BsCart size={22} />
         </Link>
-        <Link className="nav-link me-3" to="/wishlist">
+        <Link className="nav-link me-3 text-white" to="/wishlist">
           <BsHeart size={22} />
         </Link>
 
         {role ? (
           <div className="dropdown">
-            <BsPersonCircle size={24} className="profile-icon dropdown-toggle" data-bs-toggle="dropdown" />
+            <BsPersonCircle size={24} className="profile-icon dropdown-toggle text-white" data-bs-toggle="dropdown" />
             <ul className="dropdown-menu dropdown-menu-end">
               <li>
                 {role === "user" && <Link className="dropdown-item" to="/user-dashboard">Dashboard</Link>}

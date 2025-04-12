@@ -22,7 +22,7 @@ const SellerLogin = () => {
                 alert("Login successful!");
                 localStorage.setItem("sellertoken", response.data.token);
                 navigate("/seller-dashboard");
-                
+                window.location.reload(); // Reload the page to reflect the login state
             } else {
                 setError("Invalid email or password.");
             }

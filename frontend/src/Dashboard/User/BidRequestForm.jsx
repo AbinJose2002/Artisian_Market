@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { toast } from 'react-toastify';
 
@@ -15,8 +15,52 @@ const BidRequestForm = ({ onRequestSubmitted }) => {
         dimensions: '',
         material: '',
         lastDate: '',
-        image: null
+        image: null,
+        firstName: '',
+        lastName: '',
+        mobile: ''
     });
+
+    useEffect(() => {
+        fetchUserDetails();
+    }, []);
+
+    const fetchUserDetails = async () => {
+        try {
+            const token = localStorage.getItem('usertoken');
+            if (!token) {
+                toast.error('Please login to proceed.');
+                return;
+            }
+
+            const response = await axios.get('http://localhost:8080/user/details', {
+                headers: { Authorization: `Bearer ${token}` }
+            });
+
+            if (response.data.success) {
+                const { first_name, last_name, mobile } = response.data.user;
+                setFormData((prev) => ({
+                    ...prev,
+                    firstName: first_name,
+                    lastName: last_name,
+                    mobile
+                }));
+            } else {
+                toast.error('Failed to fetch user details.');
+            }
+        } catch (error) {
+            console.error('Error fetching user details:', error);
+
+            // Handle server errors
+            if (error.response?.status === 500) {
+                toast.error('Server error: Unable to fetch user details.');
+            } else if (error.response?.status === 403) {
+                toast.error('Access denied. Please login again.');
+            } else {
+                toast.error('An error occurred while fetching user details.');
+            }
+        }
+    };
 
     const categories = ['Painting', 'Sculpture', 'Photography', 'Digital Art', 'Others'];
     const conditions = ['New', 'Like New', 'Used - Excellent', 'Used - Good', 'Antique'];
@@ -89,7 +133,10 @@ const BidRequestForm = ({ onRequestSubmitted }) => {
                     dimensions: '',
                     material: '',
                     lastDate: '',
-                    image: null
+                    image: null,
+                    firstName: '',
+                    lastName: '',
+                    mobile: ''
                 });
                 // Notify parent component
                 if (onRequestSubmitted) {
@@ -241,6 +288,45 @@ const BidRequestForm = ({ onRequestSubmitted }) => {
                                 required
                             />
                             {errors.image && <div className="invalid-feedback">{errors.image}</div>}
+                        </div>
+
+                        <div className="col-md-6">
+                            <label className="form-label">First Name</label>
+                            <input
+                                type="text"
+                                name="firstName"
+                                className={`form-control ${errors.firstName ? 'is-invalid' : ''}`}
+                                value={formData.firstName}
+                                onChange={handleChange}
+                                readOnly
+                            />
+                            {errors.firstName && <div className="invalid-feedback">{errors.firstName}</div>}
+                        </div>
+
+                        <div className="col-md-6">
+                            <label className="form-label">Last Name</label>
+                            <input
+                                type="text"
+                                name="lastName"
+                                className={`form-control ${errors.lastName ? 'is-invalid' : ''}`}
+                                value={formData.lastName}
+                                onChange={handleChange}
+                                readOnly
+                            />
+                            {errors.lastName && <div className="invalid-feedback">{errors.lastName}</div>}
+                        </div>
+
+                        <div className="col-md-6">
+                            <label className="form-label">Mobile Number</label>
+                            <input
+                                type="text"
+                                name="mobile"
+                                className={`form-control ${errors.mobile ? 'is-invalid' : ''}`}
+                                value={formData.mobile}
+                                onChange={handleChange}
+                                readOnly
+                            />
+                            {errors.mobile && <div className="invalid-feedback">{errors.mobile}</div>}
                         </div>
 
                         <div className="col-12">

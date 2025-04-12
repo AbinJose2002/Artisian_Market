@@ -22,7 +22,7 @@ const InstructorLogin = () => {
                 alert("Login successful!");
                 localStorage.setItem("instructortoken", response.data.token);
                 navigate("/instructor-dashboard");
-                
+                window.location.reload(); // Reload the page to reflect the login state
             } else {
                 setError("Invalid email or password.");
             }

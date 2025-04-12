@@ -6,7 +6,7 @@ from werkzeug.utils import secure_filename
 from bson import ObjectId
 from app import users_collection, bcrypt, product_collection
 
-user_bp = Blueprint('user', __name__)
+user_bp = Blueprint('user_service', __name__)  # Changed the name to 'user_service'
 
 UPLOAD_FOLDER = "uploads/profile_photos"
 ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif'}
@@ -48,9 +48,9 @@ def register():
     user_data = {
         "email": email,
         "password": hashed_password,
-        "first_name": fname,
-        "last_name": lname,
-        "mobile": mobile,
+        "first_name": fname,  # Ensure first name is stored
+        "last_name": lname,   # Ensure last name is stored
+        "mobile": mobile,     # Ensure mobile number is stored
         "address": address,
         "profile_photo": filename,
         "cart": [],  # Initialize empty cart array
@@ -135,3 +135,31 @@ def get_wishlist():
     except Exception as e:
         print(f"Error getting wishlist: {str(e)}")
         return jsonify(success=False, message=str(e)), 500
+
+def convert_objectid_to_str(data):
+    """Recursively convert ObjectId fields to strings in a dictionary or list."""
+    if isinstance(data, dict):
+        return {key: convert_objectid_to_str(value) for key, value in data.items()}
+    elif isinstance(data, list):
+        return [convert_objectid_to_str(item) for item in data]
+    elif isinstance(data, ObjectId):
+        return str(data)
+    return data
+
+@user_bp.route('/details', methods=['GET'])
+@jwt_required()
+def get_user_details():
+    try:
+        user_email = get_jwt_identity()
+        user = users_collection.find_one({"email": user_email}, {"password": 0})  # Exclude password from response
+
+        if not user:
+            return jsonify(success=False, message="User not found"), 404
+
+        # Recursively convert ObjectId fields to strings
+        user = convert_objectid_to_str(user)
+
+        return jsonify(success=True, user=user)  # Ensure first_name, last_name, and mobile are included
+    except Exception as e:
+        print(f"Error fetching user details: {str(e)}")
+        return jsonify(success=False, message="Failed to fetch user details"), 500

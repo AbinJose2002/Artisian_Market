@@ -72,7 +72,7 @@ def create_app():
     from app.controllers.reviews import reviews_bp
     
     app.register_blueprint(home_bp)
-    app.register_blueprint(user_bp, url_prefix='/user')
+    app.register_blueprint(user_bp, url_prefix='/user')  # Updated to match the new name
     app.register_blueprint(seller_bp, url_prefix='/seller')  # Make sure this line exists
     app.register_blueprint(instructor_bp, url_prefix='/instructor')
     app.register_blueprint(admin_bp, url_prefix='/admin')

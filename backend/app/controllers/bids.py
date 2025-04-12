@@ -4,7 +4,7 @@ from bson import ObjectId
 from datetime import datetime
 import time
 import os
-from app import bids_collection, instructor_collection
+from app import bids_collection, instructor_collection, users_collection
 
 bids_bp = Blueprint('bids', __name__)
 
@@ -172,10 +172,14 @@ def get_participated_bids():
                 # Determine if bid has ended
                 last_date = bid.get('last_date')
                 is_ended = last_date and last_date <= current_time
+                print(bid)
 
                 processed_bid = {
                     '_id': str(bid['_id']),
                     'title': bid.get('title', 'Untitled'),
+                    'first_name': bid.get('first_name', ''),
+                    'last_name': bid.get('last_name', ''),
+                    'mobile': bid.get('mobile', ''),
                     'description': bid.get('description', ''),
                     'image': bid.get('image'),
                     'category': bid.get('category', 'Other'),
@@ -209,6 +213,11 @@ def request_bid():
         user_email = get_jwt_identity()
         print(f"Bid request from user: {user_email}")
         
+        # Fetch user details
+        user = users_collection.find_one({"email": user_email}, {"first_name": 1, "last_name": 1, "mobile": 1})
+        if not user:
+            return jsonify(success=False, message="User not found"), 404
+
         # Get form data
         title = request.form.get('title')
         description = request.form.get('description')
@@ -256,6 +265,9 @@ def request_bid():
             'last_date': last_date,
             'image': image_filename,
             'requester_email': user_email,
+            'first_name': user.get('first_name'),  # Store first name
+            'last_name': user.get('last_name'),    # Store last name
+            'mobile': user.get('mobile'),          # Store mobile number
             'status': 'pending',  # Initial status
             'created_at': datetime.utcnow(),
             'bids': []  # No bids initially
