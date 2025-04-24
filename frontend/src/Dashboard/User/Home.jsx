@@ -8,6 +8,7 @@ import Reviews from './Reviews';
 import MyReviews from './MyReviews';
 import Events from './Events';
 import UserBids from './UserBids'; // Add this import
+import Profile from './Profile';
 
 function Home() {
     const [selected, setSelected] = useState('dashboard');
@@ -24,6 +25,8 @@ function Home() {
                 return <UserBids />;
             case 'reviews':
                 return <Reviews />;
+            case 'profile':
+                return <Profile />;
             case 'myreviews':
                 return <MyReviews />;
             default:

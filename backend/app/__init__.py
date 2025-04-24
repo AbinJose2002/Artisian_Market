@@ -23,6 +23,14 @@ orders_collection = db.get_collection("orders")
 admin_collection = db.get_collection("admin")
 bids_collection = db.get_collection("bids")  # Add bids collection
 
+# Initialize MongoDB collections
+users_collection = db["users"]
+product_collection = db["product"]
+material_collection = db["materials"]  # New collection for craft materials
+orders_collection = db["orders"]
+# auction_collection = db["auctions"]
+bid_collection = db["bids"]
+
 def create_app():
     # Configure static file serving
     base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -70,6 +78,8 @@ def create_app():
     from app.controllers.admin import admin_bp
     from app.controllers.bids import bids_bp
     from app.controllers.reviews import reviews_bp
+    from app.controllers.material import material_bp  # Import new controller
+    # from app.controllers.auction import auction_bp
     
     app.register_blueprint(home_bp)
     app.register_blueprint(user_bp, url_prefix='/user')  # Updated to match the new name
@@ -81,6 +91,8 @@ def create_app():
     app.register_blueprint(payment_bp, url_prefix='/payment')
     app.register_blueprint(order_bp, url_prefix='/order')
     app.register_blueprint(reviews_bp, url_prefix='/reviews')
+    app.register_blueprint(material_bp, url_prefix='/material')  # Register new controller
+    # app.register_blueprint(auction_bp, url_prefix='/auction')
     
     # Update CORS configuration to be more permissive during development
     CORS(app, resources={

@@ -1,6 +1,6 @@
 import React from 'react'
 import './App.css';
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
+import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom'
 import UserRegister from "./Auth/User/UserRegister"
 import UserLogin from "./Auth/User/UserLogin"
 import InstructorLogin from "./Auth/Instructor/InstructorLogin"
@@ -23,12 +23,19 @@ import AdminRegister from "./Auth/Admin/AdminRegister";
 import AdminHome from './Dashboard/Admin/AdminHome';
 import Bids from './Pages/Bids';
 import Contact from './Home/Contact'
+import Crafts from './Pages/Crafts'
+import CraftDetail from './Pages/CraftDetail'
+import { ToastContainer } from 'react-toastify';
+import 'react-toastify/dist/ReactToastify.css';
+import ThankYou from './Pages/ThankYou';
+// import Footer from '';
 
 export default function App() {
   return (
     <div>
-      <BrowserRouter>
+      <Router>
         <Navbar />
+        <ToastContainer />
         <Routes>
           {/* Public Routes */}
           <Route path="/" element={<Body />} />
@@ -39,6 +46,9 @@ export default function App() {
           <Route path='/cart' element={<Cart />}></Route>
           <Route path="/bids" element={<Bids />} />
           <Route path="/contact" element={<Contact />} />
+          <Route path="/craft" element={<Crafts />} />
+          <Route path="/craft/:id" element={<CraftDetail />} />
+          <Route path="/thank-you" element={<ThankYou />} />
 
           {/* User Routes */}
           <Route path="/user-register" element={<UserRegister />} />
@@ -64,7 +74,8 @@ export default function App() {
           <Route path="/payment/success" element={<PaymentSuccess />} />
           <Route path="/payment/cancel" element={<Navigate to="/events" replace />} />
         </Routes>
-      </BrowserRouter>
+        {/* <Footer /> */}
+      </Router>
     </div>
   )
 }

@@ -163,3 +163,57 @@ def get_user_details():
     except Exception as e:
         print(f"Error fetching user details: {str(e)}")
         return jsonify(success=False, message="Failed to fetch user details"), 500
+
+@user_bp.route('/update', methods=['PUT'])
+@jwt_required()
+def update_user():
+    try:
+        user_email = get_jwt_identity()
+        user = users_collection.find_one({"email": user_email})
+
+        if not user:
+            return jsonify(success=False, message="User not found"), 404
+
+        # Get form data
+        update_data = {}
+        for field in ['first_name', 'last_name', 'mobile', 'address']:
+            if field in request.form:
+                update_data[field] = request.form.get(field)
+
+        # Handle profile photo upload
+        if "profile_photo" in request.files:
+            file = request.files["profile_photo"]
+            if file and file.filename and allowed_file(file.filename):
+                # Delete old profile photo if exists
+                old_photo = user.get('profile_photo')
+                if old_photo:
+                    old_photo_path = os.path.join(UPLOAD_FOLDER, old_photo)
+                    if os.path.exists(old_photo_path):
+                        try:
+                            os.remove(old_photo_path)
+                        except Exception as e:
+                            print(f"Error deleting old profile photo: {e}")
+
+                # Save new profile photo
+                filename = secure_filename(file.filename)
+                filepath = os.path.join(UPLOAD_FOLDER, filename)
+                file.save(filepath)
+                update_data['profile_photo'] = filename
+
+        if not update_data:
+            return jsonify(success=False, message="No data to update"), 400
+
+        # Update user in database
+        result = users_collection.update_one(
+            {"email": user_email},
+            {"$set": update_data}
+        )
+
+        if result.modified_count > 0:
+            return jsonify(success=True, message="Profile updated successfully")
+        else:
+            return jsonify(success=True, message="No changes made")
+
+    except Exception as e:
+        print(f"Error updating user profile: {str(e)}")
+        return jsonify(success=False, message=f"Failed to update profile: {str(e)}"), 500

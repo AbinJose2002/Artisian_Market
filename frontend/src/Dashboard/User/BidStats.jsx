@@ -161,7 +161,7 @@ const BidStats = () => {
                             >
                                 View Won Auctions
                             </Link>
-                            <button 
+                            {/* <button 
                                 className="btn btn-light mt-2"
                                 onClick={() => downloadBidDetails({
                                     id: 123, // Replace with actual bid ID
@@ -173,7 +173,7 @@ const BidStats = () => {
                                 })}
                             >
                                 Download Details
-                            </button>
+                            </button> */}
                         </div>
                     </div>
                 </div>

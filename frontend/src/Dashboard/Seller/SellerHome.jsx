@@ -8,7 +8,10 @@ import SellerProfile from './SellerProfile';
 import SellerDashboard from './SellerDashboard';
 import SellerBids from './SellerBids';
 import SellerBidRequests from './SellerBidRequests';
+import MaterialsManager from './MaterialsManager';
+import PurchasedItems from './PurchasedItems';
 
+// Fix the export by using a named function declaration and adding default export
 function SellerHome() {
     const [selected, setSelected] = useState('dashboard');
 
@@ -18,8 +21,12 @@ function SellerHome() {
                 return <SellerDashboard />;
             case 'products':
                 return <AddProduct />;
+            case 'materials':
+                return <MaterialsManager />;
             case 'orders':
                 return <Orders />;
+            case 'purchased':
+                return <PurchasedItems />;
             case 'bids':
                 return <SellerBids />;
             case 'bidrequests':
@@ -42,4 +49,5 @@ function SellerHome() {
     );
 }
 
+// Make sure to properly export the component
 export default SellerHome;

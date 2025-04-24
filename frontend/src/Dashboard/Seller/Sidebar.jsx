@@ -29,12 +29,28 @@ function Sidebar({ setSelected }) {
                     Products
                 </button>
                 <button 
+                    data-id="materials"
+                    className="btn btn-outline-light text-start" 
+                    onClick={() => setSelected('materials')}
+                >
+                    <span className="me-2">🧶</span>
+                    Craft Materials
+                </button>
+                <button 
                     data-id="orders"
                     className="btn btn-outline-light text-start" 
                     onClick={() => setSelected('orders')}
                 >
                     <span className="me-2">📦</span>
                     Orders
+                </button>
+                <button 
+                    data-id="purchased"
+                    className="btn btn-outline-light text-start" 
+                    onClick={() => setSelected('purchased')}
+                >
+                    <span className="me-2">🛒</span>
+                    My Purchases
                 </button>
                 <button 
                     data-id="bids"
@@ -75,5 +91,4 @@ function Sidebar({ setSelected }) {
     );
 }
 
-// Add this default export statement to fix the issue
 export default Sidebar;

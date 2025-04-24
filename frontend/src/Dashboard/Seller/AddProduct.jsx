@@ -19,10 +19,22 @@ const AddProduct = () => {
     const [editingProductId, setEditingProductId] = useState(null);
     const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
     const [deleteProductId, setDeleteProductId] = useState(null);
+    const [customCategory, setCustomCategory] = useState("");
+    const [allCategories, setAllCategories] = useState([  // New state for all categories
+        "Others",
+        "Painting",
+        "Sculpture",
+        "Photography",
+        "Digital Art",
+        "Calligraphy",
+        "Mixed Media",
+    ]);
 
-    const sellerToken = localStorage.getItem("sellertoken"); // Get seller token from local storage
+    const sellerToken = localStorage.getItem("sellertoken");
 
-    const artCategories = [
+    // Base categories that are always available
+    const baseCategories = [
+        "Others",
         "Painting",
         "Sculpture",
         "Photography",
@@ -34,8 +46,36 @@ const AddProduct = () => {
     useEffect(() => {
         if (sellerToken) {
             fetchSellerProducts();
+            fetchAllCategories(); // New function to fetch all categories
         }
     }, []);
+
+    // New function to fetch all unique categories
+    const fetchAllCategories = async () => {
+        try {
+            const response = await axios.get("http://localhost:8080/product/categories", {
+                headers: { 
+                    'Authorization': `Bearer ${sellerToken}`,
+                    'Content-Type': 'application/json'
+                },
+            });
+            
+            if (response.data.success) {
+                // Combine base categories with unique categories from backend
+                const uniqueCategories = [...baseCategories];
+                
+                response.data.categories.forEach(category => {
+                    if (!baseCategories.includes(category) && category !== "Others") {
+                        uniqueCategories.push(category);
+                    }
+                });
+                
+                setAllCategories(uniqueCategories);
+            }
+        } catch (error) {
+            console.error("Error fetching categories:", error);
+        }
+    };
 
     const fetchSellerProducts = async () => {
         try {
@@ -72,6 +112,15 @@ const AddProduct = () => {
     const handleChange = (e) => {
         const { name, value } = e.target;
         setProductData({ ...productData, [name]: value });
+        
+        // If category changes to "Others", reset the custom category
+        if (name === "category" && value === "Others") {
+            setCustomCategory("");
+        }
+    };
+
+    const handleCustomCategoryChange = (e) => {
+        setCustomCategory(e.target.value);
     };
 
     const handleImageChange = (e) => {
@@ -120,7 +169,20 @@ const AddProduct = () => {
         formData.append("name", productData.name);
         formData.append("description", productData.description);
         formData.append("price", productData.price);
-        formData.append("category", productData.category);
+        
+        let finalCategory = productData.category;
+        
+        // Use custom category if "Others" is selected
+        if (productData.category === "Others" && customCategory.trim()) {
+            finalCategory = customCategory.trim();
+            
+            // Add the new category to our list if it's not already there
+            if (!allCategories.includes(finalCategory)) {
+                setAllCategories(prev => [...prev, finalCategory]);
+            }
+        }
+        
+        formData.append("category", finalCategory);
         formData.append("image", productData.image);
         formData.append("quantity", productData.quantity);
 
@@ -140,7 +202,9 @@ const AddProduct = () => {
             setIsEditing(false);
             setEditingProductId(null);
             setProductData({ name: "", description: "", price: "", category: "Painting", image: null, quantity: "" });
+            setCustomCategory("");
             fetchSellerProducts();
+            fetchAllCategories(); // Refresh categories after adding a new one
         } catch (error) {
             console.error("Error saving product:", error);
         }
@@ -192,19 +256,30 @@ const AddProduct = () => {
                                     onChange={handleChange}
                                 />
 
-                                {/* Category Select Dropdown */}
+                                {/* Category Select Dropdown - Now uses allCategories */}
                                 <select
                                     className="form-select mb-2"
                                     name="category"
                                     value={productData.category}
                                     onChange={handleChange}
                                 >
-                                    {artCategories.map((category, index) => (
+                                    {allCategories.map((category, index) => (
                                         <option key={index} value={category}>
                                             {category}
                                         </option>
                                     ))}
                                 </select>
+
+                                {/* Custom Category Input - shows only when Others is selected */}
+                                {productData.category === "Others" && (
+                                    <input
+                                        className="form-control mb-2"
+                                        type="text"
+                                        placeholder="Enter custom category"
+                                        value={customCategory}
+                                        onChange={handleCustomCategoryChange}
+                                    />
+                                )}
 
                                 <input
                                     className="form-control mb-2"

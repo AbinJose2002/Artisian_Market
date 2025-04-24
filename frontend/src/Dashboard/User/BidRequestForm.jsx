@@ -250,6 +250,10 @@ const BidRequestForm = ({ onRequestSubmitted }) => {
                                 onChange={handleChange}
                                 placeholder="e.g., 24x36 inches"
                             />
+                            <small className="form-text text-muted">
+                                <i className="bi bi-info-circle me-1"></i>
+                                Please specify values with units (cm, inch, kg, etc.)
+                            </small>
                         </div>
 
                         <div className="col-md-4">

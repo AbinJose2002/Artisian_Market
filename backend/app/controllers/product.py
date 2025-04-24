@@ -66,16 +66,24 @@ def verify_stock():
         product_id = request.json.get("product_id")
         quantity_requested = request.json.get("quantity", 1)
         
+        if not product_id:
+            return jsonify(success=False, message="Product ID is required"), 400
+        
         product = product_collection.find_one({"_id": ObjectId(product_id)})
         if not product:
             return jsonify(success=False, message="Product not found"), 404
-            
-        if product["quantity"] < quantity_requested:
-            return jsonify(success=False, message="Insufficient stock"), 400
-            
+        
+        # Safely check quantity - if quantity field is missing, assume 0
+        product_quantity = product.get("quantity", 0)
+        print(f"Product {product_id} has quantity: {product_quantity}")
+        
+        if product_quantity < quantity_requested:
+            return jsonify(success=False, message="Insufficient stock", available=False), 200
+        
         return jsonify(success=True, available=True)
     except Exception as e:
-        return jsonify(success=False, message=str(e)), 500
+        print(f"Stock verification error: {str(e)}")
+        return jsonify(success=False, message=str(e), available=False), 500
 
 # 🔹 Update Stock API
 @product_bp.route("/update/stock", methods=["PUT"])
@@ -315,19 +323,30 @@ def remove_from_wishlist(product_id):
 @jwt_required()
 def get_cart():
     try:
-        user_email = get_jwt_identity()
-        if not user_email:
-            return jsonify(success=False, message="Invalid token"), 401
-
-        # Find user and ensure cart exists
-        user = users_collection.find_one({"email": user_email})
+        # This is the identity from the JWT token
+        user_identity = get_jwt_identity()
+        
+        # Check which type of user we're dealing with (by checking if it's an email or not)
+        is_email = '@' in user_identity
+        
+        if is_email:
+            user_email = user_identity
+            user = users_collection.find_one({"email": user_email})
+        else:
+            # If it's not an email, assume it's a seller ID and find by ID
+            user = users_collection.find_one({"_id": user_identity})
+            
+            if not user:
+                # Try finding by seller_id field
+                user = users_collection.find_one({"seller_id": user_identity})
+        
         if not user:
             return jsonify(success=False, message="User not found"), 404
 
         # Initialize cart if it doesn't exist
         if "cart" not in user:
             users_collection.update_one(
-                {"email": user_email},
+                {"_id": user["_id"]},
                 {"$set": {"cart": []}}
             )
             return jsonify(success=True, items=[])
@@ -358,5 +377,16 @@ def remove_from_cart(product_id):
         if result.modified_count > 0:
             return jsonify(success=True, message="Item removed from cart")
         return jsonify(success=False, message="Item not found in cart"), 404
+    except Exception as e:
+        return jsonify(success=False, message=str(e)), 500
+
+# 🔹 New API to fetch all unique categories
+@product_bp.route("/categories", methods=["GET"])
+@jwt_required(optional=True)
+def get_categories():
+    try:
+        # Get all unique categories from products
+        categories = product_collection.distinct("category")
+        return jsonify(success=True, categories=categories)
     except Exception as e:
         return jsonify(success=False, message=str(e)), 500
