@@ -24,7 +24,15 @@ const Crafts = () => {
         try {
             const response = await axios.get('http://localhost:8080/material/list');
             if (response.data.success) {
-                setMaterials(response.data.materials);
+                // Process materials data to ensure quantity information is available
+                const materialsWithStock = response.data.materials.map(material => ({
+                    ...material,
+                    // Default to 0 if quantity is not available
+                    quantity: material.quantity || 0,
+                    isInStock: (material.quantity || 0) > 0
+                }));
+                
+                setMaterials(materialsWithStock);
                 
                 // Extract unique categories
                 const uniqueCategories = [...new Set(response.data.materials.map(material => material.category))];
@@ -74,18 +82,48 @@ const Crafts = () => {
         }
 
         try {
+            console.log("Adding material to wishlist with token:", userToken.substring(0, 10) + "...");
+            
+            // Ensure we're using the correct authentication header
             const response = await axios.post(
                 'http://localhost:8080/material/wishlist/add',
                 { material_id: materialId },
-                { headers: { Authorization: `Bearer ${userToken}` } }
+                { 
+                    headers: { 
+                        'Authorization': `Bearer ${userToken}`,
+                        'Content-Type': 'application/json'
+                    } 
+                }
             );
 
             if (response.data.success) {
                 toast.success("Added to wishlist!");
+            } else {
+                toast.error(response.data.message || "Failed to add to wishlist");
             }
         } catch (error) {
-            toast.error("Failed to add to wishlist");
             console.error("Error adding to wishlist:", error);
+            
+            // Handle different error types
+            if (error.response) {
+                // The request was made and the server responded with a status code
+                // that falls out of the range of 2xx
+                if (error.response.status === 401) {
+                    toast.error("Authentication failed. Please log in again.");
+                    // Clear stored tokens as they may be invalid
+                    localStorage.removeItem('usertoken');
+                    localStorage.removeItem('sellertoken');
+                    localStorage.removeItem('instructortoken');
+                } else {
+                    toast.error(`Failed to add to wishlist: ${error.response.data?.message || error.response.status}`);
+                }
+            } else if (error.request) {
+                // The request was made but no response was received
+                toast.error("Server did not respond. Please try again later.");
+            } else {
+                // Something happened in setting up the request that triggered an Error
+                toast.error("Failed to add to wishlist");
+            }
         }
     };
 
@@ -229,6 +267,15 @@ const Crafts = () => {
                                         <p className="card-text text-truncate">{material.description}</p>
                                         <p className="text-primary fw-bold">₹{material.price}</p>
                                         <p className="card-text"><small className="text-muted">Category: {material.category}</small></p>
+                                        
+                                        {/* Stock Status Indicator */}
+                                        <p className="card-text">
+                                            <span className={`stock-badge ${material.isInStock ? 'in-stock' : 'out-of-stock'}`}>
+                                                {material.isInStock 
+                                                    ? `In Stock (${material.quantity})` 
+                                                    : 'Out of Stock'}
+                                            </span>
+                                        </p>
                                     </div>
                                 </Link>
                                 <div className="card-footer bg-white d-flex justify-content-between">
@@ -241,6 +288,7 @@ const Crafts = () => {
                                     <button 
                                         className="btn btn-primary btn-sm" 
                                         onClick={() => handleAddToCart(material._id)}
+                                        disabled={!material.isInStock}
                                     >
                                         <FontAwesomeIcon icon={faShoppingCart} /> Add to Cart
                                     </button>
@@ -276,6 +324,25 @@ const Crafts = () => {
                 .filter-panel {
                     border: none;
                     box-shadow: 0 2px 15px rgba(0,0,0,0.1);
+                }
+                .stock-badge {
+                    display: inline-block;
+                    padding: 2px 8px;
+                    border-radius: 12px;
+                    font-size: 0.8rem;
+                    font-weight: 500;
+                }
+                .in-stock {
+                    background-color: #d4edda;
+                    color: #155724;
+                }
+                .out-of-stock {
+                    background-color: #f8d7da;
+                    color: #721c24;
+                }
+                .btn:disabled {
+                    opacity: 0.6;
+                    cursor: not-allowed;
                 }
             `}</style>
         </div>

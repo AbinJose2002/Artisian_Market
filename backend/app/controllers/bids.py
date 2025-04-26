@@ -1,10 +1,11 @@
-from flask import Blueprint, request, jsonify, current_app
+from flask import Blueprint, request, jsonify, current_app, send_file
 from flask_jwt_extended import jwt_required, get_jwt_identity
 from bson import ObjectId
 from datetime import datetime
 import time
 import os
 from app import bids_collection, instructor_collection, users_collection
+from app.utils.pdf_generator import generate_auction_invoice_pdf
 
 bids_bp = Blueprint('bids', __name__)
 
@@ -513,4 +514,62 @@ def get_bid_summary():
         
     except Exception as e:
         print(f"Error in get_bid_summary: {str(e)}")
+        return jsonify(success=False, message=str(e)), 500
+
+@bids_bp.route("/invoice/<bid_id>", methods=["GET"])
+@jwt_required()
+def download_bid_invoice(bid_id):
+    """
+    Generate and download an invoice PDF for a completed bid
+    """
+    try:
+        user_identity = get_jwt_identity()
+        print(f"Generating invoice for bid {bid_id} requested by {user_identity}")
+        
+        # Find the bid
+        bid = bids_collection.find_one({"_id": ObjectId(bid_id)})
+        
+        if not bid:
+            return jsonify(success=False, message="Bid not found"), 404
+        
+        # Check if this is a forced completed status from the header
+        force_completed = request.headers.get('X-Auction-Status') == 'completed'
+        
+        # Only check status if not forced
+        if not force_completed:
+            # Check if bid is completed and has a winner
+            if bid.get("status") != "completed":
+                return jsonify(success=False, message="Bid is not yet completed"), 400
+        
+        # Check if user is authorized (winner or seller)
+        if user_identity != bid.get("highest_bidder") and user_identity != bid.get("seller_id"):
+            print(f"Authorization failed. User: {user_identity}, Winner: {bid.get('highest_bidder')}, Seller: {bid.get('seller_id')}")
+            return jsonify(success=False, message="You are not authorized to download this invoice"), 403
+        
+        # Format the bid data for the PDF
+        bid_data = {
+            "auction_id": str(bid["_id"]),
+            "title": bid.get("title", "Artwork"),
+            "description": bid.get("description", ""),
+            "current_amount": bid.get("current_amount", 0),
+            "highest_bidder": bid.get("highest_bidder", "Unknown"),
+            "seller_id": bid.get("seller_id", "Unknown"),
+            "last_date": bid.get("last_date", "Unknown"),
+            "bidder_role": "Buyer" if user_identity == bid.get("highest_bidder") else "Seller",
+            "status": "completed"  # Always treat as completed for invoice
+        }
+        
+        # Generate PDF
+        pdf_buffer = generate_auction_invoice_pdf(bid_data)
+        
+        # Return the PDF
+        return send_file(
+            pdf_buffer,
+            mimetype='application/pdf',
+            as_attachment=True,
+            download_name=f"auction_invoice_{bid_id[:8]}.pdf"
+        )
+        
+    except Exception as e:
+        print(f"Error generating bid invoice: {e}")
         return jsonify(success=False, message=str(e)), 500

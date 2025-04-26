@@ -2,6 +2,8 @@ import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { toast } from 'react-toastify';
 import SellerBidRequestForm from './SellerBidRequestForm';
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import { faDownload } from '@fortawesome/free-solid-svg-icons';
 
 const SellerBids = () => {
     const [bids, setBids] = useState([]);
@@ -124,6 +126,74 @@ const SellerBids = () => {
         }
     };
 
+    const downloadAuctionInvoice = (bid) => {
+        try {
+            // Force the status to be 'completed' before sending to the server
+            const bidWithCompletedStatus = {
+                ...bid,
+                status: 'completed'
+            };
+            
+            const token = localStorage.getItem('sellertoken');
+            if (!token) {
+                toast.error('Authentication required to download invoice');
+                return;
+            }
+            
+            toast.info('Preparing invoice for download...');
+            
+            // Create a downloadable link
+            const downloadLink = document.createElement('a');
+            
+            // Use correct endpoint for bid invoices
+            const bidId = bidWithCompletedStatus._id;
+            downloadLink.href = `http://localhost:8080/bids/invoice/${bidId}`;
+            
+            // Use fetch to get the PDF with authentication
+            fetch(downloadLink.href, {
+                headers: { 
+                    'Authorization': `Bearer ${token}`,
+                    // Add a custom header to indicate this is a completed auction
+                    'X-Auction-Status': 'completed'
+                },
+                method: 'GET'
+            })
+            .then(response => {
+                if (!response.ok) {
+                    // Handle HTTP errors
+                    console.error(`HTTP error: ${response.status}`);
+                    if (response.status === 400) {
+                        throw new Error('Auction must be completed before generating invoice');
+                    } else if (response.status === 404) {
+                        throw new Error('Invoice not found');
+                    } else if (response.status === 403) {
+                        throw new Error('Not authorized to download this invoice');
+                    } else {
+                        throw new Error(`Server error: ${response.status}`);
+                    }
+                }
+                return response.blob();
+            })
+            .then(blob => {
+                const url = window.URL.createObjectURL(blob);
+                downloadLink.href = url;
+                downloadLink.download = `auction_invoice_${bidId.substring(0, 8)}.pdf`;
+                document.body.appendChild(downloadLink);
+                downloadLink.click();
+                window.URL.revokeObjectURL(url);
+                document.body.removeChild(downloadLink);
+                toast.success('Invoice downloaded successfully');
+            })
+            .catch(error => {
+                console.error('Error downloading invoice:', error);
+                toast.error(error.message || 'Failed to download invoice');
+            });
+        } catch (error) {
+            console.error('Error setting up invoice download:', error);
+            toast.error('Failed to set up invoice download');
+        }
+    };
+
     if (loading) return (
         <div className="text-center py-5">
             <div className="spinner-border text-primary" role="status">
@@ -140,7 +210,10 @@ const SellerBids = () => {
         return lastDate < now && 
                bid.highest_bidder === bid.my_email && 
                bid.my_highest_bid === bid.current_amount;
-    });
+    }).map(bid => ({
+        ...bid,
+        status: 'completed' // Mark all won bids as completed
+    }));
 
     const activeBids = participatedBids.filter(bid => {
         const lastDate = new Date(bid.last_date);
@@ -415,6 +488,17 @@ const SellerBids = () => {
                                                     <p className="mb-1">
                                                         <strong>Won On:</strong> {new Date(bid.last_date).toLocaleDateString()}
                                                     </p>
+                                                    <p className="mb-1">
+                                                        <strong>Status:</strong> <span className="text-success">Completed</span>
+                                                    </p>
+                                                    
+                                                    {/* Download button with no disabled state since we mark them all as completed */}
+                                                    <button 
+                                                        className="btn btn-sm btn-outline-success mt-3"
+                                                        onClick={() => downloadAuctionInvoice(bid)}
+                                                    >
+                                                        <FontAwesomeIcon icon={faDownload} className="me-1" /> Download Invoice
+                                                    </button>
                                                 </div>
                                             </div>
                                         </div>

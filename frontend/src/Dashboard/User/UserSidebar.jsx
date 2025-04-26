@@ -5,9 +5,10 @@ function UserSidebar({ setSelected }) {
         { id: 'dashboard', label: 'Dashboard', icon: '📊' },
         { id: 'orders', label: 'My Orders', icon: '🛍️' },
         { id: 'events', label: 'My Events', icon: '🎭' },
-        { id: 'bids', label: 'My Bids', icon: '🔨' }, // Add this new item
+        { id: 'bids', label: 'My Bids', icon: '🔨' },
         { id: 'reviews', label: 'Write Reviews', icon: '✏️' },
         { id: 'myreviews', label: 'My Reviews', icon: '⭐' },
+        { id: 'complaints', label: 'Complaints', icon: '📣' }, // Add this new item
         { id: 'profile', label: 'Profile', icon: '👤' }
     ];
 

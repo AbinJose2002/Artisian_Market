@@ -82,9 +82,15 @@ def get_seller_materials():
 def get_materials():
     materials = list(material_collection.find())
 
-    # Convert MongoDB ObjectId to string
+    # Convert MongoDB ObjectId to string and ensure quantity field exists
     for material in materials:
         material["_id"] = str(material["_id"])
+        # Make sure quantity exists and is an integer
+        if "quantity" not in material:
+            material["quantity"] = 0
+        else:
+            # Ensure it's an integer value
+            material["quantity"] = int(material.get("quantity", 0))
 
     return jsonify(success=True, materials=materials)
 
@@ -251,7 +257,11 @@ def add_to_cart():
 @jwt_required()
 def add_to_wishlist():
     try:
+        # Get user identity from the token
         user_identity = get_jwt_identity()
+        print(f"User identity from token: {user_identity}")
+        
+        # Get material ID from request
         material_id = request.json.get("material_id")
         
         if not material_id:
@@ -261,16 +271,17 @@ def add_to_wishlist():
         material = material_collection.find_one({"_id": ObjectId(material_id)})
         if not material:
             return jsonify(success=False, message="Material not found"), 404
-            
-        # Handle different user types (email vs ID)
+        
+        # Determine if user_identity is an email (user) or ID (seller/instructor)
         is_email = '@' in user_identity
         
         if is_email:
+            # For regular users
             user = users_collection.find_one({"email": user_identity})
             if not user:
                 return jsonify(success=False, message="User not found"), 404
                 
-            # Initialize wishlist if it doesn't exist
+            # Make sure wishlist_materials field exists
             if "wishlist_materials" not in user:
                 users_collection.update_one(
                     {"email": user_identity},
@@ -283,14 +294,14 @@ def add_to_wishlist():
                 {"$addToSet": {"wishlist_materials": ObjectId(material_id)}}
             )
         else:
-            user = users_collection.find_one({"_id": user_identity})
+            # For sellers/instructors by ID
+            user = users_collection.find_one({"_id": ObjectId(user_identity)})
             if not user:
                 user = users_collection.find_one({"seller_id": user_identity})
-                
-            if not user:
-                return jsonify(success=False, message="User not found"), 404
-                
-            # Initialize wishlist if it doesn't exist
+                if not user:
+                    return jsonify(success=False, message="User not found"), 404
+            
+            # Make sure wishlist_materials field exists
             if "wishlist_materials" not in user:
                 users_collection.update_one(
                     {"_id": user["_id"]},
@@ -302,15 +313,15 @@ def add_to_wishlist():
                 {"_id": user["_id"]},
                 {"$addToSet": {"wishlist_materials": ObjectId(material_id)}}
             )
-
+                
         if result.modified_count > 0 or result.matched_count > 0:
             return jsonify(success=True, message="Added to wishlist successfully!")
         else:
-            return jsonify(success=False, message="Failed to update wishlist"), 500
-
+            return jsonify(success=False, message="Failed to update wishlist or item already in wishlist"), 200
+            
     except Exception as e:
         print(f"Error adding material to wishlist: {str(e)}")
-        return jsonify(success=False, message=str(e)), 500
+        return jsonify(success=False, message=f"An error occurred: {str(e)}"), 500
 
 @material_bp.route("/cart", methods=["GET"])
 @jwt_required()

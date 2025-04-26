@@ -28,6 +28,8 @@ import CraftDetail from './Pages/CraftDetail'
 import { ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import ThankYou from './Pages/ThankYou';
+import AdminComplaints from "./Dashboard/Admin/AdminComplaints";
+import AdminProtected from './components/AdminProtected';
 // import Footer from '';
 
 export default function App() {
@@ -69,6 +71,13 @@ export default function App() {
           <Route path="/admin-login" element={<AdminLogin />} />
           <Route path="/admin-register" element={<AdminRegister />} />
           <Route path="/admin-dashboard" element={<AdminHome />} />
+          {/* <Route path="/admin/complaints" element={
+            <AdminProtected>
+              <AdminDashboardLayout>
+                <AdminComplaints />
+              </AdminDashboardLayout>
+            </AdminProtected>
+          } /> */}
 
           {/* Payment Routes */}
           <Route path="/payment/success" element={<PaymentSuccess />} />

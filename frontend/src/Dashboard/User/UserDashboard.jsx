@@ -217,22 +217,28 @@ const UserDashboard = () => {
                         <div className="card-body">
                             {recentOrders.length > 0 ? (
                                 <div className="list-group">
-                                    {recentOrders.map(order => (
-                                        <div key={order.order_id} className="list-group-item list-group-item-action">
-                                            <div className="d-flex w-100 justify-content-between">
-                                                <h6 className="mb-1">Order #{order.order_id.slice(-6)}</h6>
-                                                <small className="text-muted">
-                                                    {new Date(order.created_at).toLocaleDateString()}
-                                                </small>
-                                            </div>
-                                            <p className="mb-1">
-                                                {order.items.length} item(s) - ₹{order.total_amount}
-                                            </p>
-                                            <small className={`badge ${order.status === 'delivered' ? 'bg-success' : 'bg-primary'}`}>
-                                                {order.status}
-                                            </small>
-                                        </div>
-                                    ))}
+                                    {recentOrders.map((order, index) => {
+                                        // Add null/undefined checking for order and order._id
+                                        const orderId = order && order._id ? order._id.slice(-6) : 'N/A';
+                                        // Calculate total amount safely
+                                        const totalAmount = order && order.total_amount ? 
+                                            order.total_amount : 
+                                            (order && order.items && Array.isArray(order.items)) ? 
+                                                order.items.reduce((sum, item) => sum + parseFloat(item.price || 0), 0) : 0;
+                                        
+                                        return (
+                                            <tr key={index}>
+                                                <td>#{orderId}</td>
+                                                <td>{order && order.created_at ? new Date(order.created_at).toLocaleDateString() : 'N/A'}</td>
+                                                <td>₹{totalAmount}</td>
+                                                <td>
+                                                    <span className={`badge bg-${order && order.status === 'completed' ? 'success' : 'warning'}`}>
+                                                        {order && order.status ? order.status : 'Processing'}
+                                                    </span>
+                                                </td>
+                                            </tr>
+                                        );
+                                    })}
                                 </div>
                             ) : (
                                 <p className="text-muted">No orders found.</p>

@@ -5,7 +5,8 @@ import Dashboard from './Dashboard';
 import UserStats from './UserStats';
 import InstructorStats from './InstructorStats';
 import SellerStats from './SellerStats';
-import BidRequests from './BidRequests';  // Add this import
+import BidRequests from './BidRequests';
+import AdminComplaints from './AdminComplaints';  // Import the AdminComplaints component
 
 function AdminHome() {
     const [selected, setSelected] = useState('dashboard');
@@ -22,6 +23,8 @@ function AdminHome() {
                 return <SellerStats />;
             case 'bids':
                 return <BidRequests />;
+            case 'complaints':
+                return <AdminComplaints />;  // Render the AdminComplaints component
             default:
                 return <Dashboard />;
         }

@@ -71,7 +71,7 @@ def create_app():
     from app.controllers.home import home_bp
     from app.controllers.user import user_bp
     from app.controllers.instructor import instructor_bp
-    from app.controllers.seller import seller_bp  # Make sure this import exists
+    from app.controllers.seller import seller_bp  # Ensure seller_bp is imported
     from app.controllers.product import product_bp
     from app.controllers.payment import payment_bp
     from app.controllers.order import order_bp
@@ -79,11 +79,12 @@ def create_app():
     from app.controllers.bids import bids_bp
     from app.controllers.reviews import reviews_bp
     from app.controllers.material import material_bp  # Import new controller
-    # from app.controllers.auction import auction_bp
+    from app.controllers.complaints import complaints_bp  # Add this line
+    from app.controllers.event import event_bp  # Add this line
     
     app.register_blueprint(home_bp)
     app.register_blueprint(user_bp, url_prefix='/user')  # Updated to match the new name
-    app.register_blueprint(seller_bp, url_prefix='/seller')  # Make sure this line exists
+    app.register_blueprint(seller_bp, url_prefix='/seller')  # Register the seller blueprint
     app.register_blueprint(instructor_bp, url_prefix='/instructor')
     app.register_blueprint(admin_bp, url_prefix='/admin')
     app.register_blueprint(product_bp, url_prefix='/product')
@@ -92,7 +93,8 @@ def create_app():
     app.register_blueprint(order_bp, url_prefix='/order')
     app.register_blueprint(reviews_bp, url_prefix='/reviews')
     app.register_blueprint(material_bp, url_prefix='/material')  # Register new controller
-    # app.register_blueprint(auction_bp, url_prefix='/auction')
+    app.register_blueprint(complaints_bp, url_prefix='/complaints')  # Add this line
+    app.register_blueprint(event_bp, url_prefix='/event')  # Add this line
     
     # Update CORS configuration to be more permissive during development
     CORS(app, resources={

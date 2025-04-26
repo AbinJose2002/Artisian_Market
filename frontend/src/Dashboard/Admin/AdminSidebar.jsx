@@ -1,12 +1,15 @@
 import React from 'react';
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import { faTachometerAlt, faUsers, faChalkboardTeacher, faStore, faGavel, faComments } from '@fortawesome/free-solid-svg-icons';
 
 function AdminSidebar({ setSelected }) {
     const menuItems = [
-        { id: 'dashboard', label: 'Dashboard', icon: '📊' },
-        { id: 'users', label: 'User Statistics', icon: '👥' },
-        { id: 'instructors', label: 'Instructor Statistics', icon: '👨‍🏫' },
-        { id: 'sellers', label: 'Seller Statistics', icon: '🛍️' },
-        { id: 'bids', label: 'Bid Requests', icon: '🔨' }  // Add this line
+        { id: 'dashboard', label: 'Dashboard', icon: <FontAwesomeIcon icon={faTachometerAlt} /> },
+        { id: 'users', label: 'User Statistics', icon: <FontAwesomeIcon icon={faUsers} /> },
+        { id: 'instructors', label: 'Instructor Statistics', icon: <FontAwesomeIcon icon={faChalkboardTeacher} /> },
+        { id: 'sellers', label: 'Seller Statistics', icon: <FontAwesomeIcon icon={faStore} /> },
+        { id: 'bids', label: 'Bid Requests', icon: <FontAwesomeIcon icon={faGavel} /> },
+        { id: 'complaints', label: 'Complaints', icon: <FontAwesomeIcon icon={faComments} /> }
     ];
 
     return (

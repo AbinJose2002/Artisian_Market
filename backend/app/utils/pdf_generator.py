@@ -143,3 +143,155 @@ def generate_receipt_pdf(order_data):
     doc.build(elements)
     buffer.seek(0)
     return buffer
+
+def generate_auction_invoice_pdf(auction_data):
+    """
+    Generate a PDF invoice for a won auction bid
+    
+    Args:
+        auction_data: Dictionary containing auction/bid details
+    
+    Returns:
+        BytesIO object containing the PDF
+    """
+    from io import BytesIO
+    from reportlab.lib.pagesizes import letter
+    from reportlab.lib import colors
+    from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
+    from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+    from datetime import datetime
+    
+    buffer = BytesIO()
+    doc = SimpleDocTemplate(buffer, pagesize=letter)
+    styles = getSampleStyleSheet()
+    
+    # Create custom styles
+    title_style = ParagraphStyle(
+        'Title',
+        parent=styles['Heading1'],
+        fontSize=16,
+        alignment=1,
+        spaceAfter=20
+    )
+    
+    heading_style = ParagraphStyle(
+        'Heading',
+        parent=styles['Heading2'],
+        fontSize=14,
+        spaceAfter=10
+    )
+    
+    normal_style = styles["Normal"]
+    
+    # Start building the document
+    elements = []
+    
+    # Title
+    elements.append(Paragraph("Art Auction Invoice", title_style))
+    elements.append(Spacer(1, 20))
+    
+    # Invoice info
+    invoice_data = [
+        ["Invoice Date:", datetime.now().strftime("%Y-%m-%d")],
+        ["Auction ID:", auction_data.get("auction_id", "N/A")],
+        ["End Date:", auction_data.get("last_date", "N/A")]
+    ]
+    
+    invoice_table = Table(invoice_data, colWidths=[100, 300])
+    invoice_table.setStyle(TableStyle([
+        ('TEXTCOLOR', (0, 0), (-1, -1), colors.black),
+        ('ALIGN', (0, 0), (0, -1), 'LEFT'),
+        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+        ('FONTNAME', (0, 0), (0, -1), 'Helvetica-Bold'),
+    ]))
+    
+    elements.append(invoice_table)
+    elements.append(Spacer(1, 20))
+    
+    # Item details
+    elements.append(Paragraph("Auction Details", heading_style))
+    elements.append(Spacer(1, 10))
+    
+    item_data = [
+        ["Item", "Description", "Winning Bid"],
+    ]
+    
+    item_data.append([
+        auction_data.get("title", "N/A"),
+        auction_data.get("description", "N/A"),
+        f"₹{auction_data.get('current_amount', 0)}"
+    ])
+    
+    item_table = Table(item_data, colWidths=[100, 300, 100])
+    item_table.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
+        ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+        ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+        ('FONTSIZE', (0, 0), (-1, 0), 12),
+        ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
+        ('GRID', (0, 0), (-1, -1), 0.5, colors.black),
+    ]))
+    
+    elements.append(item_table)
+    elements.append(Spacer(1, 20))
+    
+    # Bidder details
+    elements.append(Paragraph("Bidder Information", heading_style))
+    elements.append(Spacer(1, 10))
+    
+    bidder_data = [
+        ["Bidder Email:", auction_data.get("highest_bidder", "N/A")],
+        ["Bidder Role:", auction_data.get("bidder_role", "Buyer")],
+    ]
+    
+    bidder_table = Table(bidder_data, colWidths=[100, 300])
+    bidder_table.setStyle(TableStyle([
+        ('TEXTCOLOR', (0, 0), (-1, -1), colors.black),
+        ('ALIGN', (0, 0), (0, -1), 'LEFT'),
+        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+        ('FONTNAME', (0, 0), (0, -1), 'Helvetica-Bold'),
+    ]))
+    
+    elements.append(bidder_table)
+    elements.append(Spacer(1, 20))
+    
+    # Total
+    elements.append(Paragraph("Payment Summary", heading_style))
+    elements.append(Spacer(1, 10))
+    
+    payment_data = [
+        ["Winning Bid Amount:", f"₹{auction_data.get('current_amount', 0)}"],
+        ["Platform Fee (5%):", f"₹{float(auction_data.get('current_amount', 0)) * 0.05:.2f}"],
+        ["Total Amount Due:", f"₹{float(auction_data.get('current_amount', 0)) * 1.05:.2f}"]
+    ]
+    
+    payment_table = Table(payment_data, colWidths=[150, 150])
+    payment_table.setStyle(TableStyle([
+        ('TEXTCOLOR', (0, 0), (-1, -1), colors.black),
+        ('ALIGN', (0, 0), (0, -1), 'LEFT'),
+        ('ALIGN', (1, 0), (1, -1), 'RIGHT'),
+        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+        ('FONTNAME', (0, 0), (0, -1), 'Helvetica-Bold'),
+        ('FONTNAME', (0, 2), (1, 2), 'Helvetica-Bold'),
+        ('LINEABOVE', (0, 2), (1, 2), 1, colors.black),
+    ]))
+    
+    elements.append(payment_table)
+    elements.append(Spacer(1, 40))
+    
+    # Terms and conditions
+    terms_text = """
+    Terms and Conditions:
+    1. This is an official receipt for your auction purchase.
+    2. The artwork will be shipped within 5 business days.
+    3. For any inquiries, please contact support@artisianmarket.com.
+    4. All sales are final. No returns or exchanges are allowed.
+    """
+    elements.append(Paragraph(terms_text, normal_style))
+    
+    # Build the PDF
+    doc.build(elements)
+    buffer.seek(0)
+    return buffer

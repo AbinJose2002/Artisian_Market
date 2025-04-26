@@ -686,3 +686,32 @@ def request_instructor_bid():
         import traceback
         print(traceback.format_exc())  # Print full traceback for debugging
         return jsonify(success=False, message=str(e)), 500
+
+@instructor_bp.route('/list', methods=['GET'])
+@jwt_required()
+def get_instructors_list():
+    """Get list of all instructors"""
+    try:
+        # This endpoint returns a simplified list of instructors for user complaints
+        instructors = list(instructor_collection.find({}, {
+            "email": 1,
+            "first_name": 1, 
+            "last_name": 1,
+            "art_specialization": 1
+        }))
+        
+        # Format instructors for response
+        formatted_instructors = []
+        for instructor in instructors:
+            formatted_instructors.append({
+                "_id": str(instructor["_id"]),
+                "name": f"{instructor.get('first_name', '')} {instructor.get('last_name', '')}".strip() or "Unknown",
+                "email": instructor.get("email", ""),
+                "expertise": instructor.get("art_specialization", "")
+            })
+            
+        return jsonify(success=True, instructors=formatted_instructors)
+        
+    except Exception as e:
+        print(f"Error fetching instructors list: {str(e)}")
+        return jsonify(success=False, message=str(e)), 500

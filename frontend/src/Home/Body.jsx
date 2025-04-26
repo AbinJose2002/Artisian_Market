@@ -140,7 +140,7 @@ const Body = () => {
                         <p className="text-primary fw-bold">₹{product.price}</p>
                         <div className="d-flex justify-content-between">
                           <span className="badge bg-light text-dark">{product.category || 'Art'}</span>
-                          <button className="btn btn-sm btn-outline-primary">Add to Cart</button>
+                          {/* <button className="btn btn-sm btn-outline-primary">Add to Cart</button> */}
                         </div>
                       </div>
                     </div>

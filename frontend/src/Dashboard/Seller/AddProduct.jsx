@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import axios from "axios";
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faPenToSquare, faTrash } from '@fortawesome/free-solid-svg-icons';
+import { faPenToSquare, faTrash, faChartLine } from '@fortawesome/free-solid-svg-icons';
 import "bootstrap/dist/css/bootstrap.min.css";
 
 const AddProduct = () => {
@@ -29,6 +29,10 @@ const AddProduct = () => {
         "Calligraphy",
         "Mixed Media",
     ]);
+    const [showStatsModal, setShowStatsModal] = useState(false);
+    const [selectedProduct, setSelectedProduct] = useState(null);
+    const [productStats, setProductStats] = useState(null);
+    const [loadingStats, setLoadingStats] = useState(false);
 
     const sellerToken = localStorage.getItem("sellertoken");
 
@@ -210,6 +214,86 @@ const AddProduct = () => {
         }
     };
 
+    const fetchProductStats = async (productId) => {
+        setLoadingStats(true);
+        try {
+            console.log(`Fetching stats for product ID: ${productId}`);
+            const response = await axios.get(`http://localhost:8080/product/stats/${productId}`, {
+                headers: { 'Authorization': `Bearer ${sellerToken}` }
+            });
+            
+            if (response.data.success) {
+                console.log("Stats received:", response.data.stats);
+                // Ensure all required fields exist with fallback values
+                const stats = {
+                    totalSales: response.data.stats?.totalSales || 0,
+                    totalRevenue: response.data.stats?.totalRevenue || 0,
+                    lastOrderDate: response.data.stats?.lastOrderDate || null,
+                    averageRating: response.data.stats?.averageRating || 0,
+                    monthlyTrend: response.data.stats?.monthlyTrend || []
+                };
+                
+                // Ensure monthlyTrend is always an array
+                if (!Array.isArray(stats.monthlyTrend)) {
+                    stats.monthlyTrend = [];
+                }
+                
+                // Ensure all months have a sales value
+                stats.monthlyTrend = stats.monthlyTrend.map(month => ({
+                    month: month.month || 'N/A',
+                    sales: typeof month.sales === 'number' ? month.sales : 0
+                }));
+                
+                setProductStats(stats);
+            } else {
+                // Initialize with default values
+                setProductStats({
+                    totalSales: 0,
+                    totalRevenue: 0,
+                    lastOrderDate: null,
+                    averageRating: 0,
+                    monthlyTrend: generateDefaultMonthlyTrend()
+                });
+            }
+        } catch (error) {
+            console.error("Error fetching product statistics:", error);
+            // Initialize with default values on error
+            setProductStats({
+                totalSales: 0,
+                totalRevenue: 0,
+                lastOrderDate: null,
+                averageRating: 0,
+                monthlyTrend: generateDefaultMonthlyTrend()
+            });
+        } finally {
+            setLoadingStats(false);
+        }
+    };
+
+    // Helper function to generate default monthly trend data
+    const generateDefaultMonthlyTrend = () => {
+        const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun'];
+        return months.map(month => ({
+            month: month,
+            sales: 0
+        }));
+    };
+
+    const showProductStats = (product) => {
+        setSelectedProduct(product);
+        setShowStatsModal(true);
+        fetchProductStats(product._id);
+    };
+
+    const formatDate = (dateString) => {
+        if (!dateString) return 'Never';
+        return new Date(dateString).toLocaleDateString('en-US', {
+            year: 'numeric',
+            month: 'long',
+            day: 'numeric'
+        });
+    };
+
     return (
         <div className="container mt-4">
             {/* Add Product Button */}
@@ -362,6 +446,12 @@ const AddProduct = () => {
                                             <FontAwesomeIcon icon={faPenToSquare} /> Edit
                                         </button>
                                         <button 
+                                            className="btn btn-sm btn-outline-info"
+                                            onClick={() => showProductStats(product)}
+                                        >
+                                            <FontAwesomeIcon icon={faChartLine} /> Stats
+                                        </button>
+                                        <button 
                                             className="btn btn-sm btn-outline-danger"
                                             onClick={() => {
                                                 setDeleteProductId(product._id);
@@ -377,6 +467,107 @@ const AddProduct = () => {
                     ))
                 )}
             </div>
+
+            {/* Stats Modal */}
+            {showStatsModal && selectedProduct && (
+                <div className="modal fade show d-block" tabIndex="-1">
+                    <div className="modal-dialog modal-lg">
+                        <div className="modal-content">
+                            <div className="modal-header">
+                                <h5 className="modal-title">
+                                    Sales Statistics: {selectedProduct?.name || 'Product'}
+                                </h5>
+                                <button 
+                                    type="button" 
+                                    className="btn-close" 
+                                    onClick={() => setShowStatsModal(false)}
+                                ></button>
+                            </div>
+                            <div className="modal-body">
+                                {loadingStats ? (
+                                    <div className="text-center py-4">
+                                        <div className="spinner-border text-primary" role="status">
+                                            <span className="visually-hidden">Loading...</span>
+                                        </div>
+                                        <p className="mt-2">Loading statistics...</p>
+                                    </div>
+                                ) : (
+                                    <>
+                                        <div className="row stats-summary">
+                                            <div className="col-md-3 text-center mb-3">
+                                                <div className="stats-card">
+                                                    <h3>{productStats?.totalSales || 0}</h3>
+                                                    <p>Units Sold</p>
+                                                </div>
+                                            </div>
+                                            <div className="col-md-3 text-center mb-3">
+                                                <div className="stats-card">
+                                                    <h3>₹{productStats?.totalRevenue || 0}</h3>
+                                                    <p>Total Revenue</p>
+                                                </div>
+                                            </div>
+                                            <div className="col-md-3 text-center mb-3">
+                                                <div className="stats-card">
+                                                    <h3>{formatDate(productStats?.lastOrderDate)}</h3>
+                                                    <p>Last Sale</p>
+                                                </div>
+                                            </div>
+                                            <div className="col-md-3 text-center mb-3">
+                                                <div className="stats-card">
+                                                    <h3>{productStats?.averageRating?.toFixed(1) || '0.0'}/5</h3>
+                                                    <p>Average Rating</p>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        
+                                        <h6 className="mt-4 mb-3">Monthly Sales Trend</h6>
+                                        
+                                        {productStats?.monthlyTrend && productStats.monthlyTrend.length > 0 ? (
+                                            <div className="monthly-trend-chart">
+                                                {/* Simple bar chart visualization */}
+                                                <div className="chart-container">
+                                                    {productStats.monthlyTrend.map((month, index) => {
+                                                        // Prevent division by zero
+                                                        const maxSales = Math.max(1, ...productStats.monthlyTrend.map(m => m.sales || 0));
+                                                        const heightPercentage = Math.min(100, ((month.sales || 0) / maxSales) * 100);
+                                                        
+                                                        return (
+                                                            <div key={index} className="chart-bar-container">
+                                                                <div 
+                                                                    className="chart-bar" 
+                                                                    style={{ 
+                                                                        height: `${heightPercentage}%`,
+                                                                        backgroundColor: '#3a1d6e'
+                                                                    }}
+                                                                >
+                                                                    <span className="chart-value">{month.sales || 0}</span>
+                                                                </div>
+                                                                <span className="chart-label">{month.month || ''}</span>
+                                                            </div>
+                                                        );
+                                                    })}
+                                                </div>
+                                            </div>
+                                        ) : (
+                                            <div className="alert alert-info">
+                                                No monthly sales data available yet.
+                                            </div>
+                                        )}
+                                    </>
+                                )}
+                            </div>
+                            <div className="modal-footer">
+                                <button 
+                                    className="btn btn-secondary" 
+                                    onClick={() => setShowStatsModal(false)}
+                                >
+                                    Close
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
 
             <style jsx>{`
                 .add-product-btn {
@@ -459,6 +650,67 @@ const AddProduct = () => {
                 .btn-outline-danger:hover {
                     background-color: #dc3545;
                     color: white;
+                }
+                .btn-outline-info {
+                    color: #17a2b8;
+                    border-color: #17a2b8;
+                }
+                .btn-outline-info:hover {
+                    background-color: #17a2b8;
+                    color: white;
+                }
+                .stats-summary {
+                    margin-bottom: 20px;
+                }
+                .stats-card {
+                    padding: 15px;
+                    background-color: #f8f9fc;
+                    border-radius: 8px;
+                    box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+                }
+                .stats-card h3 {
+                    color: #3a1d6e;
+                    font-size: 1.5rem;
+                    margin-bottom: 5px;
+                }
+                .stats-card p {
+                    color: #6c757d;
+                    margin-bottom: 0;
+                }
+                .chart-container {
+                    display: flex;
+                    justify-content: space-between;
+                    align-items: flex-end;
+                    height: 200px;
+                    padding: 0 10px;
+                    margin-top: 20px;
+                }
+                .chart-bar-container {
+                    display: flex;
+                    flex-direction: column;
+                    align-items: center;
+                    width: 100%;
+                }
+                .chart-bar {
+                    width: 30px;
+                    min-height: 5px;
+                    border-radius: 3px 3px 0 0;
+                    position: relative;
+                    transition: height 0.5s ease;
+                }
+                .chart-value {
+                    position: absolute;
+                    top: -20px;
+                    left: 0;
+                    right: 0;
+                    text-align: center;
+                    font-size: 0.75rem;
+                    font-weight: bold;
+                }
+                .chart-label {
+                    margin-top: 5px;
+                    font-size: 0.8rem;
+                    color: #666;
                 }
             `}</style>
         </div>

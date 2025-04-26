@@ -7,7 +7,8 @@ import OrderDetails from './OrderDetails';
 import Reviews from './Reviews';
 import MyReviews from './MyReviews';
 import Events from './Events';
-import UserBids from './UserBids'; // Add this import
+import UserBids from './UserBids';
+import UserComplaints from './UserComplaints'; // Import the new component
 import Profile from './Profile';
 
 function Home() {
@@ -21,7 +22,7 @@ function Home() {
                 return <OrderDetails />;
             case 'events':
                 return <Events />;
-            case 'bids': // Add this case
+            case 'bids':
                 return <UserBids />;
             case 'reviews':
                 return <Reviews />;
@@ -29,6 +30,8 @@ function Home() {
                 return <Profile />;
             case 'myreviews':
                 return <MyReviews />;
+            case 'complaints':
+                return <UserComplaints />; // Add this case
             default:
                 return <UserDashboard />;
         }
