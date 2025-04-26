@@ -35,7 +35,7 @@ const Bids = () => {
     const handleBid = async (bidId) => {
         try {
             // Allow both user and instructor tokens
-            const token = localStorage.getItem('usertoken') || localStorage.getItem('instructortoken');
+            const token = localStorage.getItem('usertoken') || localStorage.getItem('instructortoken') || localStorage.getItem('sellertoken');
             if (!token) {
                 toast.error('Please login to place a bid');
                 return;
@@ -68,7 +68,7 @@ const Bids = () => {
                 throw new Error(data.message || 'Failed to place bid');
             }
         } catch (error) {
-            toast.error(error.response?.data?.message || 'Failed to place bid');
+            toast.error(error.message || error.response?.data?.message || 'Failed to place bid');
             console.error('Bid error:', error);
         }
     };
@@ -99,6 +99,16 @@ const Bids = () => {
                                     <p><strong>Current Bid:</strong> ₹{bid.current_amount}</p>
                                     <p><strong>Minimum Increment:</strong> ₹{bid.min_increment}</p>
                                     <p><strong>Ends on:</strong> {new Date(bid.last_date).toLocaleDateString()}</p>
+                                    
+                                    {/* Show highest bidder name if available */}
+                                    {bid.bids && bid.bids.length > 0 && (
+                                        <p>
+                                            <strong>Current Highest Bidder:</strong> {
+                                                bid.bids[bid.bids.length - 1]?.user_name || 
+                                                'Unknown'
+                                            }
+                                        </p>
+                                    )}
                                     
                                     {activeBid === bid._id ? (
                                         <div className="mt-3">

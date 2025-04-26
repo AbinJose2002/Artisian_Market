@@ -5,7 +5,7 @@ import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { 
   faCheck, faTimes, faEye, faSpinner, faCommentDots, 
   faExclamationTriangle, faInfoCircle, faFileAlt, faFileImage,
-  faFilePdf, faFileWord, faFile, faDownload
+  faFilePdf, faFileWord, faFile, faDownload, faSearch
 } from '@fortawesome/free-solid-svg-icons';
 
 const AdminComplaints = () => {
@@ -17,6 +17,7 @@ const AdminComplaints = () => {
   const [responseStatus, setResponseStatus] = useState('in_progress');
   const [processingId, setProcessingId] = useState(null);
   const [filter, setFilter] = useState('all');
+  const [typeFilter, setTypeFilter] = useState('all'); // Add type filter state
   const [searchQuery, setSearchQuery] = useState('');
   const [attachmentUrl, setAttachmentUrl] = useState(null);
   const [attachmentType, setAttachmentType] = useState('unknown');
@@ -37,6 +38,7 @@ const AdminComplaints = () => {
         });
 
         if (response.data.success) {
+            console.log(response.data.complaints);
           setComplaints(response.data.complaints);
         } else {
           // If API fails, use mock data for development
@@ -210,6 +212,36 @@ const AdminComplaints = () => {
     }
   };
 
+  const updateComplaintStatus = async (complaintId, newStatus, resolution = '') => {
+    try {
+        setUpdatingId(complaintId);
+        const token = localStorage.getItem('admintoken');
+        
+        // Use the updated endpoint
+        const response = await axios.put(
+            `http://localhost:8080/complaints/${complaintId}/change-status`,
+            { 
+                status: newStatus,
+                resolution: resolution
+            },
+            { headers: { Authorization: `Bearer ${token}` } }
+        );
+        
+        if (response.data.success) {
+            toast.success('Complaint status updated successfully');
+            fetchComplaints();
+        } else {
+            toast.error(response.data.message || 'Failed to update status');
+        }
+    } catch (error) {
+        console.error('Error updating complaint status:', error);
+        toast.error('Failed to update status');
+    } finally {
+        setUpdatingId(null);
+        setShowResolutionModal(false);
+    }
+};
+
   const getSeverityBadge = (severity) => {
     switch (severity) {
       case 'low':
@@ -254,15 +286,26 @@ const AdminComplaints = () => {
   };
 
   const getComplaintTypeIcon = (type) => {
-    return type === 'seller' ? 
-      <span className="badge bg-primary">Seller</span> : 
-      <span className="badge bg-info">Instructor</span>;
+    if (type === 'seller') {
+      return <span className="badge bg-primary">Seller</span>;
+    } else if (type === 'instructor') {
+      return <span className="badge bg-info">Instructor</span>;
+    } else if (type === 'user') {
+      return <span className="badge bg-secondary">User</span>;
+    } else {
+      return <span className="badge bg-dark">Unknown</span>;
+    }
   };
 
   // Filter and search functionality
   const filteredComplaints = complaints.filter(complaint => {
     // Filter by status
     if (filter !== 'all' && complaint.status !== filter) {
+      return false;
+    }
+    
+    // Filter by type
+    if (typeFilter !== 'all' && complaint.type !== typeFilter) {
       return false;
     }
 
@@ -283,50 +326,158 @@ const AdminComplaints = () => {
     <div className="container-fluid py-4">
       <h2 className="mb-4">Complaints Management</h2>
 
-      {/* Filters and search */}
-      <div className="row mb-4">
-        <div className="col-md-6">
-          <div className="btn-group" role="group">
-            <button 
-              className={`btn ${filter === 'all' ? 'btn-primary' : 'btn-outline-primary'}`}
-              onClick={() => setFilter('all')}
-            >
-              All
-            </button>
-            <button 
-              className={`btn ${filter === 'pending' ? 'btn-primary' : 'btn-outline-primary'}`}
-              onClick={() => setFilter('pending')}
-            >
-              Pending
-            </button>
-            <button 
-              className={`btn ${filter === 'in_progress' ? 'btn-primary' : 'btn-outline-primary'}`}
-              onClick={() => setFilter('in_progress')}
-            >
-              In Progress
-            </button>
-            <button 
-              className={`btn ${filter === 'resolved' ? 'btn-primary' : 'btn-outline-primary'}`}
-              onClick={() => setFilter('resolved')}
-            >
-              Resolved
-            </button>
-            <button 
-              className={`btn ${filter === 'rejected' ? 'btn-primary' : 'btn-outline-primary'}`}
-              onClick={() => setFilter('rejected')}
-            >
-              Rejected
-            </button>
+      {/* Enhanced Filters UI */}
+      <div className="card mb-4 filter-card">
+        <div className="card-body">
+          <div className="row align-items-center">
+            <div className="col-lg-6">
+              <h5 className="filter-title mb-3">Filter Complaints</h5>
+              
+              {/* Status Filter Tabs */}
+              <div className="filter-section mb-3">
+                <label className="filter-label mb-2">Status:</label>
+                <div className="filter-tabs">
+                  <button 
+                    className={`filter-tab ${filter === 'all' ? 'active' : ''}`}
+                    onClick={() => setFilter('all')}
+                  >
+                    All
+                  </button>
+                  <button 
+                    className={`filter-tab ${filter === 'pending' ? 'active' : ''}`}
+                    onClick={() => setFilter('pending')}
+                  >
+                    Pending
+                  </button>
+                  <button 
+                    className={`filter-tab ${filter === 'in_progress' ? 'active' : ''}`}
+                    onClick={() => setFilter('in_progress')}
+                  >
+                    In Progress
+                  </button>
+                  <button 
+                    className={`filter-tab ${filter === 'resolved' ? 'active' : ''}`}
+                    onClick={() => setFilter('resolved')}
+                  >
+                    Resolved
+                  </button>
+                  <button 
+                    className={`filter-tab ${filter === 'rejected' ? 'active' : ''}`}
+                    onClick={() => setFilter('rejected')}
+                  >
+                    Rejected
+                  </button>
+                </div>
+              </div>
+              
+              {/* Type Filter Tabs */}
+              <div className="filter-section">
+                <label className="filter-label mb-2">Type:</label>
+                <div className="filter-tabs">
+                  <button 
+                    className={`filter-tab ${typeFilter === 'all' ? 'active' : ''}`}
+                    onClick={() => setTypeFilter('all')}
+                  >
+                    All Types
+                  </button>
+                  <button 
+                    className={`filter-tab ${typeFilter === 'seller' ? 'active' : ''}`}
+                    onClick={() => setTypeFilter('seller')}
+                  >
+                    Sellers
+                  </button>
+                  <button 
+                    className={`filter-tab ${typeFilter === 'instructor' ? 'active' : ''}`}
+                    onClick={() => setTypeFilter('instructor')}
+                  >
+                    Instructors
+                  </button>
+                  <button 
+                    className={`filter-tab ${typeFilter === 'user' ? 'active' : ''}`}
+                    onClick={() => setTypeFilter('user')}
+                  >
+                    Users
+                  </button>
+                </div>
+              </div>
+            </div>
+            
+            <div className="col-lg-6 mt-3 mt-lg-0">
+              {/* Search Box */}
+              <div className="search-container">
+                <label className="filter-label mb-2">Search:</label>
+                <div className="input-group">
+                  <input
+                    type="text"
+                    className="form-control search-input"
+                    placeholder="Search by subject, description, or name..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                  />
+                  <button className="btn btn-primary">
+                    <FontAwesomeIcon icon={faSearch} />
+                  </button>
+                </div>
+              </div>
+              
+              {/* Active Filters Display */}
+              {(filter !== 'all' || typeFilter !== 'all' || searchQuery) && (
+                <div className="active-filters mt-3">
+                  <div className="d-flex align-items-center">
+                    <span className="active-filters-label me-2">Active Filters:</span>
+                    <div className="active-filters-list">
+                      {filter !== 'all' && (
+                        <span className="active-filter">
+                          Status: {filter.replace('_', ' ').charAt(0).toUpperCase() + filter.slice(1).replace('_', ' ')}
+                          <button 
+                            className="filter-remove"
+                            onClick={() => setFilter('all')}
+                          >
+                            <FontAwesomeIcon icon={faTimes} />
+                          </button>
+                        </span>
+                      )}
+                      
+                      {typeFilter !== 'all' && (
+                        <span className="active-filter">
+                          Type: {typeFilter.charAt(0).toUpperCase() + typeFilter.slice(1)}
+                          <button 
+                            className="filter-remove"
+                            onClick={() => setTypeFilter('all')}
+                          >
+                            <FontAwesomeIcon icon={faTimes} />
+                          </button>
+                        </span>
+                      )}
+                      
+                      {searchQuery && (
+                        <span className="active-filter">
+                          Search: "{searchQuery}"
+                          <button 
+                            className="filter-remove"
+                            onClick={() => setSearchQuery('')}
+                          >
+                            <FontAwesomeIcon icon={faTimes} />
+                          </button>
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                  
+                  <button 
+                    className="btn btn-sm btn-outline-secondary mt-2 clear-filters"
+                    onClick={() => {
+                      setFilter('all');
+                      setTypeFilter('all');
+                      setSearchQuery('');
+                    }}
+                  >
+                    Clear All Filters
+                  </button>
+                </div>
+              )}
+            </div>
           </div>
-        </div>
-        <div className="col-md-6">
-          <input
-            type="text"
-            className="form-control"
-            placeholder="Search complaints..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-          />
         </div>
       </div>
 
@@ -381,6 +532,31 @@ const AdminComplaints = () => {
           </table>
         </div>
       )}
+
+      {/* Add filter status indicator */}
+      <div className="d-flex align-items-center mb-3">
+        <div className="me-3">
+          <strong>Filters:</strong> 
+        </div>
+        {filter !== 'all' && (
+          <span className="badge bg-info me-2">
+            Status: {filter.charAt(0).toUpperCase() + filter.slice(1).replace('_', ' ')}
+          </span>
+        )}
+        {typeFilter !== 'all' && (
+          <span className="badge bg-info me-2">
+            Type: {typeFilter.charAt(0).toUpperCase() + typeFilter.slice(1)}
+          </span>
+        )}
+        {searchQuery && (
+          <span className="badge bg-info me-2">
+            Search: "{searchQuery}"
+          </span>
+        )}
+        {filter === 'all' && typeFilter === 'all' && !searchQuery && (
+          <span className="text-muted">No filters applied</span>
+        )}
+      </div>
 
       {/* Detail Modal */}
       {showDetailModal && selectedComplaint && (
@@ -561,6 +737,116 @@ const AdminComplaints = () => {
         }
         .badge {
           font-weight: 500;
+        }
+        .filter-card {
+          border: none;
+          box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
+          border-radius: 0.5rem;
+          margin-bottom: 1.5rem;
+        }
+        
+        .filter-title {
+          color: #495057;
+          font-weight: 600;
+        }
+        
+        .filter-section {
+          margin-bottom: 1rem;
+        }
+        
+        .filter-label {
+          display: block;
+          color: #6c757d;
+          font-weight: 500;
+          font-size: 14px;
+        }
+        
+        .filter-tabs {
+          display: flex;
+          flex-wrap: wrap;
+          gap: 0.5rem;
+        }
+        
+        .filter-tab {
+          background-color: #f8f9fa;
+          border: 1px solid #dee2e6;
+          color: #495057;
+          padding: 0.375rem 0.75rem;
+          border-radius: 0.25rem;
+          cursor: pointer;
+          transition: all 0.2s ease;
+          font-size: 14px;
+        }
+        
+        .filter-tab:hover {
+          background-color: #e9ecef;
+        }
+        
+        .filter-tab.active {
+          background-color: var(--primary-color);
+          border-color: var(--primary-color);
+          color: white;
+        }
+        
+        .search-container {
+          margin-bottom: 1rem;
+        }
+        
+        .search-input {
+          border-radius: 0.25rem 0 0 0.25rem;
+          border: 1px solid #ced4da;
+        }
+        
+        .active-filters {
+          background-color: #f8f9fa;
+          padding: 0.75rem;
+          border-radius: 0.25rem;
+        }
+        
+        .active-filters-label {
+          color: #6c757d;
+          font-weight: 500;
+          font-size: 14px;
+        }
+        
+        .active-filters-list {
+          display: flex;
+          flex-wrap: wrap;
+          gap: 0.5rem;
+        }
+        
+        .active-filter {
+          display: inline-flex;
+          align-items: center;
+          background-color: #e9ecef;
+          color: #495057;
+          padding: 0.25rem 0.5rem;
+          border-radius: 1rem;
+          font-size: 13px;
+        }
+        
+        .filter-remove {
+          background: none;
+          border: none;
+          color: #6c757d;
+          padding: 0 0.25rem;
+          margin-left: 0.25rem;
+          font-size: 12px;
+          cursor: pointer;
+        }
+        
+        .filter-remove:hover {
+          color: #dc3545;
+        }
+        
+        .clear-filters {
+          font-size: 13px;
+        }
+        
+        @media (max-width: 992px) {
+          .filter-tabs {
+            flex-wrap: wrap;
+          }
         }
       `}</style>
     </div>

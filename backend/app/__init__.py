@@ -81,6 +81,8 @@ def create_app():
     from app.controllers.material import material_bp  # Import new controller
     from app.controllers.complaints import complaints_bp  # Add this line
     from app.controllers.event import event_bp  # Add this line
+    from app.controllers.auth import auth_bp  # Add this line
+    from app.controllers.events import events_bp  # Add this line
     
     app.register_blueprint(home_bp)
     app.register_blueprint(user_bp, url_prefix='/user')  # Updated to match the new name
@@ -95,6 +97,8 @@ def create_app():
     app.register_blueprint(material_bp, url_prefix='/material')  # Register new controller
     app.register_blueprint(complaints_bp, url_prefix='/complaints')  # Add this line
     app.register_blueprint(event_bp, url_prefix='/event')  # Add this line
+    app.register_blueprint(auth_bp, url_prefix='/auth')  # Add this line
+    app.register_blueprint(events_bp, url_prefix='/events')  # Add this line
     
     # Update CORS configuration to be more permissive during development
     CORS(app, resources={

@@ -1,10 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { toast } from 'react-toastify';
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import { faDownload, faTrophy, faSpinner } from '@fortawesome/free-solid-svg-icons';
 
 const MyBids = () => {
     const [participatedBids, setParticipatedBids] = useState([]);
     const [loading, setLoading] = useState(true);
+    const [generatingInvoice, setGeneratingInvoice] = useState(null);
 
     useEffect(() => {
         const fetchParticipatedBids = async () => {
@@ -50,6 +53,49 @@ const MyBids = () => {
         return 'bg-secondary';
     };
 
+    const downloadAuctionInvoice = async (bid) => {
+        try {
+            setGeneratingInvoice(bid._id);
+            const token = localStorage.getItem('instructortoken');
+            
+            // Using fetch API which handles blob data better
+            const response = await fetch(`http://localhost:8080/bids/invoice/${bid._id}`, {
+                method: 'GET',
+                headers: { 
+                    'Authorization': `Bearer ${token}`
+                }
+            });
+            
+            if (!response.ok) {
+                throw new Error(`Server returned ${response.status}: ${response.statusText}`);
+            }
+            
+            // Get blob from response
+            const blob = await response.blob();
+            
+            // Create a URL for the blob
+            const url = window.URL.createObjectURL(blob);
+            
+            // Create a temporary link element to trigger the download
+            const link = document.createElement('a');
+            link.href = url;
+            link.setAttribute('download', `auction-invoice-${bid._id.substring(0, 8)}.pdf`);
+            document.body.appendChild(link);
+            link.click();
+            
+            // Clean up
+            window.URL.revokeObjectURL(url);
+            document.body.removeChild(link);
+            
+            toast.success('Invoice downloaded successfully');
+        } catch (error) {
+            console.error('Error downloading invoice:', error);
+            toast.error('Failed to download invoice. Please try again later.');
+        } finally {
+            setGeneratingInvoice(null);
+        }
+    };
+
     if (loading) return <div className="text-center">Loading...</div>;
 
     // Updated filtering logic for won bids
@@ -81,7 +127,7 @@ const MyBids = () => {
             {wonBids.length > 0 && (
                 <div className="mb-5">
                     <h3 className="mb-4 text-success">
-                        <i className="fas fa-trophy me-2"></i>
+                        <FontAwesomeIcon icon={faTrophy} className="me-2" />
                         Won Bids
                     </h3>
                     <div className="row g-4">
@@ -103,6 +149,36 @@ const MyBids = () => {
                                         <p className="card-text">{bid.description}</p>
                                         <p><strong>Final Bid:</strong> ₹{bid.current_amount}</p>
                                         <p><strong>Won On:</strong> {new Date(bid.end_date).toLocaleDateString()}</p>
+                                        
+                                        {/* Display bidder name if available */}
+                                        {bid.bids && bid.bids.length > 0 && (
+                                            <p>
+                                                <strong>Winner:</strong> {
+                                                    bid.highest_bidder === "me" ? "You" : 
+                                                    bid.bids.find(b => b.user_email === bid.highest_bidder)?.user_name || 
+                                                    bid.winner_name || bid.highest_bidder
+                                                }
+                                            </p>
+                                        )}
+                                        
+                                        {/* Invoice Download Button */}
+                                        <button 
+                                            className="btn btn-outline-primary mt-2"
+                                            onClick={() => downloadAuctionInvoice(bid)}
+                                            disabled={generatingInvoice === bid._id}
+                                        >
+                                            {generatingInvoice === bid._id ? (
+                                                <>
+                                                    <FontAwesomeIcon icon={faSpinner} spin className="me-2" />
+                                                    Generating...
+                                                </>
+                                            ) : (
+                                                <>
+                                                    <FontAwesomeIcon icon={faDownload} className="me-2" />
+                                                    Download Invoice
+                                                </>
+                                            )}
+                                        </button>
                                     </div>
                                 </div>
                             </div>
@@ -229,6 +305,18 @@ const MyBids = () => {
                     }
                     .card.border-success {
                         box-shadow: 0 0 15px rgba(40, 167, 69, 0.2);
+                    }
+                    .btn-outline-primary {
+                        color: #3a1d6e;
+                        border-color: #3a1d6e;
+                    }
+                    .btn-outline-primary:hover {
+                        background-color: #3a1d6e;
+                        color: white;
+                    }
+                    .btn-outline-primary:disabled {
+                        opacity: 0.6;
+                        cursor: not-allowed;
                     }
                 `}
             </style>

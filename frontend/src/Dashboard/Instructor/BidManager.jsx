@@ -18,6 +18,7 @@ const BidManager = () => {
         material: '',
         artistDetails: ''
     });
+    const [customCategory, setCustomCategory] = useState('');
 
     const [instructorBids, setInstructorBids] = useState([]);
     const [selectedBid, setSelectedBid] = useState(null);
@@ -63,6 +64,15 @@ const BidManager = () => {
         } else {
             setFormData(prev => ({ ...prev, [name]: value }));
         }
+        
+        // Reset custom category when category changes away from Others
+        if (name === 'category' && value !== 'Others') {
+            setCustomCategory('');
+        }
+    };
+    
+    const handleCustomCategoryChange = (e) => {
+        setCustomCategory(e.target.value);
     };
 
     const validate = () => {
@@ -77,6 +87,7 @@ const BidManager = () => {
         if (!formData.lastDate) newErrors.lastDate = "End date is required";
         if (selectedDate <= currentDate) newErrors.lastDate = "End date must be in the future";
         if (!formData.image) newErrors.image = "Image is required";
+        if (formData.category === 'Others' && !customCategory.trim()) newErrors.customCategory = "Custom category is required";
         
         setErrors(newErrors);
         return Object.keys(newErrors).length === 0;
@@ -95,8 +106,14 @@ const BidManager = () => {
             }
 
             const formDataToSend = new FormData();
+            // Use all formData fields except potentially override category
             Object.keys(formData).forEach(key => {
-                formDataToSend.append(key, formData[key]);
+                // If category is 'Others', use the custom category instead
+                if (key === 'category' && formData[key] === 'Others') {
+                    formDataToSend.append(key, customCategory.trim());
+                } else {
+                    formDataToSend.append(key, formData[key]);
+                }
             });
 
             const response = await axios.post(
@@ -127,6 +144,7 @@ const BidManager = () => {
                     material: '',
                     artistDetails: ''
                 });
+                setCustomCategory('');
                 fetchInstructorBids();
             } else {
                 toast.error(response.data.message || 'Failed to submit bid request');
@@ -237,6 +255,22 @@ const BidManager = () => {
                                         ))}
                                     </select>
                                 </div>
+                                
+                                {/* Add custom category input field when 'Others' is selected */}
+                                {formData.category === 'Others' && (
+                                    <div className="col-md-6">
+                                        <label className="form-label">Specify Category</label>
+                                        <input
+                                            type="text"
+                                            className={`form-control ${errors.customCategory ? 'is-invalid' : ''}`}
+                                            value={customCategory}
+                                            onChange={handleCustomCategoryChange}
+                                            placeholder="Enter custom category"
+                                            required
+                                        />
+                                        {errors.customCategory && <div className="invalid-feedback">{errors.customCategory}</div>}
+                                    </div>
+                                )}
 
                                 <div className="col-md-6">
                                     <label className="form-label">Condition</label>

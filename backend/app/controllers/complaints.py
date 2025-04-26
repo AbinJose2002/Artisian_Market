@@ -14,6 +14,7 @@ complaints_bp = Blueprint("complaints", __name__)
 complaints_collection = db.get_collection("complaints")
 sellers_collection = db.get_collection("sellers")
 instructors_collection = db.get_collection("instructors")
+users_collection = db.get_collection("users")
 
 # Define the upload folder properly, relative to the current directory
 BASE_DIR = os.getcwd()
@@ -81,6 +82,32 @@ def get_instructor_list():
         
     except Exception as e:
         print(f"Error fetching instructors list: {str(e)}")
+        return jsonify(success=False, message=str(e)), 500
+
+@complaints_bp.route("/users/list", methods=["GET"])
+@jwt_required()
+def get_users_list():
+    """Get list of all users for complaints dropdown"""
+    try:
+        # This endpoint returns a simplified list of users for the dropdown
+        users = list(users_collection.find({}, {
+            "email": 1, 
+            "name": 1
+        }))
+        
+        # Format users for response
+        formatted_users = []
+        for user in users:
+            formatted_users.append({
+                "_id": user.get("email", ""),  # Use email as ID for users
+                "email": user.get("email", ""),
+                "name": user.get("name", "")
+            })
+            
+        return jsonify(success=True, users=formatted_users)
+        
+    except Exception as e:
+        print(f"Error fetching users list: {str(e)}")
         return jsonify(success=False, message=str(e)), 500
 
 @complaints_bp.route("/user", methods=["GET"])
@@ -188,6 +215,16 @@ def submit_complaint():
                         if instructor_by_email:
                             entity = instructor_by_email
                             entity_name = f"{entity.get('first_name', '')} {entity.get('last_name', '')}".strip() or "Unknown Instructor"
+                elif complaint_type == "user":
+                    # New user entity type
+                    try:
+                        entity = users_collection.find_one({"email": entity_id})
+                        print(f"Looking for user with email: {entity_id}, found: {entity is not None}")
+                        
+                        if entity:
+                            entity_name = entity.get("name") or entity.get("email", "Unknown User")
+                    except Exception as e:
+                        print(f"Error finding user by email: {str(e)}")
                 else:
                     return jsonify(success=False, message="Invalid complaint type"), 400
             except Exception as e:
@@ -622,3 +659,199 @@ def view_attachment_public(complaint_id):
     except Exception as e:
         print(f"Error viewing attachment: {str(e)}")
         return str(e), 500
+
+@complaints_bp.route('/create', methods=['POST'])
+@jwt_required()
+def create_complaint():
+    """Create a new complaint"""
+    try:
+        # Get the authenticated user's identity
+        complainant_identity = get_jwt_identity()
+        
+        # Get complaint data from request
+        data = request.json
+        if not data:
+            return jsonify(success=False, message="No data provided"), 400
+            
+        # Required fields - changed from against_type to type
+        required_fields = ['subject', 'description', 'type']
+        for field in required_fields:
+            if field not in data or not data[field]:
+                return jsonify(success=False, message=f"{field} is required"), 400
+        
+        # Create complaint document
+        complaint = {
+            'complainant_identity': complainant_identity,
+            'complainant_type': data.get('complainant_type', 'user'),
+            'complainant_email': data.get('complainant_email', complainant_identity),
+            'complainant_name': data.get('complainant_name', 'Unknown'), 
+            'type': data.get('type'),  # Changed from against_type to type
+            'against_id': data.get('against_id', ''),
+            'against_email': data.get('against_email', ''),
+            'entityName': data.get('entityName', 'Unknown'),  # Changed from against_name to entityName
+            'subject': data.get('subject'),
+            'description': data.get('description'),
+            'status': 'pending',  # pending, investigating, resolved, rejected
+            'created_at': datetime.utcnow(),
+            'updated_at': datetime.utcnow(),
+            'event_id': data.get('event_id', ''),
+            'event_name': data.get('event_name', ''),
+            'resolution': '',
+            'resolution_date': None
+        }
+        
+        # Insert complaint into database
+        result = complaints_collection.insert_one(complaint)
+        
+        return jsonify({
+            'success': True,
+            'message': 'Complaint submitted successfully',
+            'complaint_id': str(result.inserted_id)
+        })
+        
+    except Exception as e:
+        print(f"Error creating complaint: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return jsonify(success=False, message=str(e)), 500
+
+@complaints_bp.route('/list', methods=['GET'])
+@jwt_required()
+def get_complaints_list():
+    """Get all complaints for admin view"""
+    try:
+        # Get all complaints, sorted by creation date (newest first)
+        complaints = list(complaints_collection.find().sort('created_at', -1))
+        
+        # Format complaints for response
+        formatted_complaints = []
+        for complaint in complaints:
+            formatted_complaint = {
+                '_id': str(complaint['_id']),
+                'subject': complaint.get('subject', ''),
+                'description': complaint.get('description', ''),
+                'complainant_identity': complaint.get('complainant_identity', ''),
+                'complainant_type': complaint.get('complainant_type', 'user'),
+                'against_type': complaint.get('against_type', ''),
+                'against_id': complaint.get('against_id', ''),
+                'against_email': complaint.get('against_email', ''),
+                'status': complaint.get('status', 'pending'),
+                'created_at': complaint.get('created_at', datetime.utcnow()).isoformat(),
+                'event_id': complaint.get('event_id', ''),
+                'event_name': complaint.get('event_name', '')
+            }
+            formatted_complaints.append(formatted_complaint)
+            
+        return jsonify(success=True, complaints=formatted_complaints)
+        
+    except Exception as e:
+        print(f"Error fetching complaints: {str(e)}")
+        return jsonify(success=False, message=str(e)), 500
+
+# Renamed route and function to avoid conflicts
+@complaints_bp.route('/my-complaints', methods=['GET'])
+@jwt_required()
+def get_my_complaints():
+    """Get complaints submitted by the authenticated user"""
+    try:
+        user_identity = get_jwt_identity()
+        
+        # Find complaints submitted by this user
+        complaints = list(complaints_collection.find({
+            'complainant_identity': user_identity
+        }).sort('created_at', -1))
+        
+        # Format complaints for response
+        formatted_complaints = []
+        for complaint in complaints:
+            formatted_complaint = {
+                '_id': str(complaint['_id']),
+                'subject': complaint.get('subject', ''),
+                'description': complaint.get('description', ''),
+                'against_type': complaint.get('against_type', ''),
+                'status': complaint.get('status', 'pending'),
+                'created_at': complaint.get('created_at', datetime.utcnow()).isoformat(),
+                'resolution': complaint.get('resolution', ''),
+                'event_name': complaint.get('event_name', '')
+            }
+            formatted_complaints.append(formatted_complaint)
+            
+        return jsonify(success=True, complaints=formatted_complaints)
+        
+    except Exception as e:
+        print(f"Error fetching user complaints: {str(e)}")
+        return jsonify(success=False, message=str(e)), 500
+
+@complaints_bp.route('/<complaint_id>', methods=['GET'])
+@jwt_required()
+def get_complaint_details(complaint_id):
+    """Get details of a specific complaint"""
+    try:
+        # Find the complaint by ID
+        complaint = complaints_collection.find_one({'_id': ObjectId(complaint_id)})
+        
+        if not complaint:
+            return jsonify(success=False, message="Complaint not found"), 404
+            
+        # Format complaint for response
+        formatted_complaint = {
+            '_id': str(complaint['_id']),
+            'subject': complaint.get('subject', ''),
+            'description': complaint.get('description', ''),
+            'complainant_identity': complaint.get('complainant_identity', ''),
+            'complainant_type': complaint.get('complainant_type', 'user'),
+            'against_type': complaint.get('against_type', ''),
+            'against_id': complaint.get('against_id', ''),
+            'against_email': complaint.get('against_email', ''),
+            'status': complaint.get('status', 'pending'),
+            'created_at': complaint.get('created_at', datetime.utcnow()).isoformat(),
+            'updated_at': complaint.get('updated_at', datetime.utcnow()).isoformat(),
+            'event_id': complaint.get('event_id', ''),
+            'event_name': complaint.get('event_name', ''),
+            'resolution': complaint.get('resolution', ''),
+            'resolution_date': complaint.get('resolution_date')
+        }
+            
+        return jsonify(success=True, complaint=formatted_complaint)
+        
+    except Exception as e:
+        print(f"Error fetching complaint details: {str(e)}")
+        return jsonify(success=False, message=str(e)), 500
+
+# Renamed endpoint to avoid conflict
+@complaints_bp.route('/<complaint_id>/change-status', methods=['PUT'])
+@jwt_required()
+def change_complaint_status(complaint_id):
+    """Update the status of a complaint (admin only)"""
+    try:
+        # Get data from request
+        data = request.json
+        if not data or 'status' not in data:
+            return jsonify(success=False, message="Status is required"), 400
+            
+        # Valid status values
+        valid_statuses = ['pending', 'investigating', 'resolved', 'rejected']
+        if data['status'] not in valid_statuses:
+            return jsonify(success=False, message=f"Status must be one of: {', '.join(valid_statuses)}"), 400
+            
+        # Update the complaint status
+        result = complaints_collection.update_one(
+            {'_id': ObjectId(complaint_id)},
+            {
+                '$set': {
+                    'status': data['status'],
+                    'updated_at': datetime.utcnow(),
+                    'resolution': data.get('resolution', ''),
+                    'resolution_date': datetime.utcnow() if data['status'] in ['resolved', 'rejected'] else None
+                }
+            }
+        )
+        
+        if result.modified_count == 0:
+            return jsonify(success=False, message="Complaint not found or status not changed"), 404
+            
+        return jsonify(success=True, message="Complaint status updated successfully")
+        
+    except Exception as e:
+        print(f"Error updating complaint status: {str(e)}")
+        return jsonify(success=False, message=str(e)), 500

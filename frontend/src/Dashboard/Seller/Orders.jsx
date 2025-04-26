@@ -1,11 +1,22 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { toast } from 'react-toastify';
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import { faExclamationTriangle, faTimes, faPaperPlane } from '@fortawesome/free-solid-svg-icons';
 
 function Orders() {
     const [orders, setOrders] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
+    const [showComplaintModal, setShowComplaintModal] = useState(false);
+    const [selectedOrder, setSelectedOrder] = useState(null);
+    const [complaintData, setComplaintData] = useState({
+        subject: '',
+        description: '',
+        severity: 'medium',
+        attachments: null
+    });
+    const [submittingComplaint, setSubmittingComplaint] = useState(false);
 
     const ORDER_STATUSES = ['pending', 'confirmed', 'packed', 'shipped', 'delivered', 'cancelled'];
 
@@ -50,6 +61,82 @@ function Orders() {
         } catch (error) {
             toast.error('Failed to update order status');
             console.error('Error:', error);
+        }
+    };
+
+    const openComplaintModal = (order) => {
+        setSelectedOrder(order);
+        setComplaintData({
+            subject: `Complaint regarding Order #${order.order_id.slice(-6)}`,
+            description: '',
+            severity: 'medium',
+            attachments: null
+        });
+        setShowComplaintModal(true);
+    };
+
+    const handleComplaintChange = (e) => {
+        const { name, value } = e.target;
+        setComplaintData({
+            ...complaintData,
+            [name]: value
+        });
+    };
+
+    const handleFileChange = (e) => {
+        setComplaintData({
+            ...complaintData,
+            attachments: e.target.files[0]
+        });
+    };
+
+    const submitComplaint = async () => {
+        if (!complaintData.subject || !complaintData.description) {
+            toast.error('Please fill all required fields');
+            return;
+        }
+
+        setSubmittingComplaint(true);
+
+        try {
+            const token = localStorage.getItem('sellertoken');
+            const formData = new FormData();
+            
+            formData.append('type', 'user');
+            formData.append('entityId', selectedOrder.customer_email);
+            formData.append('entityName', selectedOrder.customer_email); // Use customer email as name
+            formData.append('subject', complaintData.subject);
+            formData.append('description', complaintData.description);
+            formData.append('severity', complaintData.severity);
+            
+            if (complaintData.attachments) {
+                formData.append('attachment', complaintData.attachments);
+            }
+            
+            const response = await fetch('http://localhost:8080/complaints/submit', {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${token}`
+                },
+                body: formData
+            });
+            
+            if (response.ok) {
+                const data = await response.json();
+                if (data.success) {
+                    toast.success('Complaint submitted successfully');
+                    setShowComplaintModal(false);
+                } else {
+                    toast.error(data.message || 'Failed to submit complaint');
+                }
+            } else {
+                toast.error(`Error: ${response.status} - ${response.statusText}`);
+            }
+        } catch (error) {
+            console.error('Error submitting complaint:', error);
+            toast.error('Failed to submit complaint. Please try again later.');
+        } finally {
+            setSubmittingComplaint(false);
         }
     };
 
@@ -138,11 +225,134 @@ function Orders() {
                                             </tbody>
                                         </table>
                                     </div>
+                                    
+                                    {/* Add the Report Customer button */}
+                                    <div className="mt-3 text-end">
+                                        <button 
+                                            className="btn btn-outline-danger"
+                                            onClick={() => openComplaintModal(order)}
+                                        >
+                                            <FontAwesomeIcon icon={faExclamationTriangle} className="me-2" />
+                                            Report Customer
+                                        </button>
+                                    </div>
                                 </div>
                             </div>
                         </div>
                     ))}
                 </div>
+            )}
+
+            {/* Complaint Modal */}
+            {showComplaintModal && selectedOrder && (
+                <div className="modal fade show" style={{ display: 'block' }} tabIndex="-1">
+                    <div className="modal-dialog modal-lg">
+                        <div className="modal-content">
+                            <div className="modal-header">
+                                <h5 className="modal-title">Report Customer: {selectedOrder.customer_email}</h5>
+                                <button 
+                                    type="button" 
+                                    className="btn-close" 
+                                    onClick={() => setShowComplaintModal(false)}
+                                    aria-label="Close"
+                                ></button>
+                            </div>
+                            <div className="modal-body">
+                                <div className="alert alert-info">
+                                    <p className="mb-0">Submit a report about issues with this customer or order. This will be reviewed by our admin team.</p>
+                                </div>
+                                
+                                <div className="mb-3">
+                                    <label className="form-label">Subject</label>
+                                    <input 
+                                        type="text"
+                                        name="subject"
+                                        className="form-control"
+                                        value={complaintData.subject}
+                                        onChange={handleComplaintChange}
+                                        placeholder="Brief subject for your complaint"
+                                        required
+                                    />
+                                </div>
+                                
+                                <div className="mb-3">
+                                    <label className="form-label">Description</label>
+                                    <textarea 
+                                        name="description"
+                                        className="form-control"
+                                        value={complaintData.description}
+                                        onChange={handleComplaintChange}
+                                        rows="5"
+                                        placeholder="Please provide detailed information about your complaint"
+                                        required
+                                    ></textarea>
+                                </div>
+                                
+                                <div className="mb-3">
+                                    <label className="form-label">Severity</label>
+                                    <select 
+                                        name="severity"
+                                        className="form-select"
+                                        value={complaintData.severity}
+                                        onChange={handleComplaintChange}
+                                    >
+                                        <option value="low">Low</option>
+                                        <option value="medium">Medium</option>
+                                        <option value="high">High</option>
+                                        <option value="critical">Critical</option>
+                                    </select>
+                                </div>
+                                
+                                <div className="mb-3">
+                                    <label className="form-label">Attachment (Optional)</label>
+                                    <input 
+                                        type="file"
+                                        name="attachments"
+                                        className="form-control"
+                                        onChange={handleFileChange}
+                                        accept="image/*,.pdf,.doc,.docx"
+                                    />
+                                    <small className="text-muted">
+                                        You can upload images, PDFs, or documents as evidence
+                                    </small>
+                                </div>
+                            </div>
+                            <div className="modal-footer">
+                                <button 
+                                    type="button" 
+                                    className="btn btn-secondary" 
+                                    onClick={() => setShowComplaintModal(false)}
+                                >
+                                    <FontAwesomeIcon icon={faTimes} className="me-1" />
+                                    Cancel
+                                </button>
+                                <button 
+                                    type="button" 
+                                    className="btn btn-primary"
+                                    onClick={submitComplaint}
+                                    disabled={submittingComplaint}
+                                >
+                                    {submittingComplaint ? (
+                                        <>
+                                            <span className="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+                                            Submitting...
+                                        </>
+                                    ) : (
+                                        <>
+                                            <FontAwesomeIcon icon={faPaperPlane} className="me-1" />
+                                            Submit Report
+                                        </>
+                                    )}
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Modal Backdrop */}
+            {showComplaintModal && (
+                <div className="modal-backdrop fade show"></div>
             )}
         </div>
     );

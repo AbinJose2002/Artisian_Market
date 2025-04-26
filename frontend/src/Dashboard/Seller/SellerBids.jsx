@@ -489,6 +489,9 @@ const SellerBids = () => {
                                                         <strong>Won On:</strong> {new Date(bid.last_date).toLocaleDateString()}
                                                     </p>
                                                     <p className="mb-1">
+                                                        <strong>Winner:</strong> {bid.winner_name || 'You'}
+                                                    </p>
+                                                    <p className="mb-1">
                                                         <strong>Status:</strong> <span className="text-success">Completed</span>
                                                     </p>
                                                     

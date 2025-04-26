@@ -6,109 +6,108 @@ from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib.units import inch
 import io
 import os
+import traceback
 
 def generate_invoice_pdf(order_data):
-    # Create an in-memory PDF file
-    buffer = io.BytesIO()
-    
-    # Set up the PDF document
-    doc = SimpleDocTemplate(buffer, pagesize=letter)
-    styles = getSampleStyleSheet()
-    
-    # Custom styles
-    title_style = ParagraphStyle(
-        name='Title',
-        parent=styles['Heading1'],
-        fontSize=16,
-        alignment=1,  # 0=left, 1=center, 2=right
-        spaceAfter=20
-    )
-    
-    header_style = ParagraphStyle(
-        name='Header',
-        parent=styles['Heading2'],
-        fontSize=12,
-        spaceAfter=10
-    )
-    
-    normal_style = styles["Normal"]
-    
-    # Create content elements
-    elements = []
-    
-    # Add company logo if available
-    logo_path = os.path.join(os.getcwd(), "static", "logo.png")
-    if os.path.exists(logo_path):
-        img = Image(logo_path, width=1.5*inch, height=0.5*inch)
-        elements.append(img)
-        elements.append(Spacer(1, 10))
-    
-    # Title
-    elements.append(Paragraph("Artisian Market - Invoice", title_style))
-    elements.append(Spacer(1, 10))
-    
-    # Invoice details
-    elements.append(Paragraph(f"<b>Invoice #:</b> {order_data.get('_id', 'N/A')[:8]}", normal_style))
-    elements.append(Paragraph(f"<b>Date:</b> {datetime.now().strftime('%B %d, %Y')}", normal_style))
-    elements.append(Paragraph(f"<b>Payment ID:</b> {order_data.get('payment_id', 'N/A')}", normal_style))
-    elements.append(Spacer(1, 20))
-    
-    # Items table
-    elements.append(Paragraph("Purchased Items", header_style))
-    
-    # Table header
-    table_data = [["Item Name", "Category", "Type", "Price"]]
-    
-    # Table rows
-    for item in order_data.get('items', []):
-        item_type = "Art Product" if item.get('itemType') == 'product' else "Craft Material"
-        table_data.append([
-            item.get('name', 'N/A'),
-            item.get('category', 'N/A'),
-            item_type,
-            f"₹{item.get('price', '0.00')}"
-        ])
-    
-    # Add total row
-    total_amount = order_data.get('total_amount', sum([float(item.get('price', 0)) for item in order_data.get('items', [])]))
-    table_data.append(["", "", "<b>Total</b>", f"<b>₹{total_amount}</b>"])
-    
-    # Create and style the table
-    table = Table(table_data, colWidths=[2.5*inch, 1.5*inch, 1.5*inch, 1*inch])
-    table.setStyle(TableStyle([
-        ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
-        ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
-        ('ALIGN', (0, 0), (-1, 0), 'CENTER'),
-        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-        ('FONTSIZE', (0, 0), (-1, 0), 12),
-        ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
-        ('BACKGROUND', (0, 1), (-1, -2), colors.beige),
-        ('TEXTCOLOR', (0, 1), (-1, -1), colors.black),
-        ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
-        ('ALIGN', (3, 1), (3, -1), 'RIGHT'),  # Price column right-aligned
-        ('FONTNAME', (0, -1), (-1, -1), 'Helvetica-Bold'),  # Bold for total row
-        ('LINEBELOW', (0, 0), (-1, 0), 1, colors.black),
-        ('LINEABOVE', (0, -1), (-1, -1), 1, colors.black),
-        ('GRID', (0, 0), (-1, -2), 0.5, colors.grey),
-    ]))
-    
-    elements.append(table)
-    elements.append(Spacer(1, 20))
-    
-    # Terms and conditions
-    elements.append(Paragraph("Terms and Conditions", header_style))
-    terms = [
-        "All sales are final. No returns or exchanges unless items are damaged upon receipt.",
-        "Delivery is subject to availability and processing time.",
-        "For any queries, please contact support@artisianmarket.com"
-    ]
-    for term in terms:
-        elements.append(Paragraph(f"• {term}", normal_style))
-    
-    # Build the PDF
-    doc.build(elements)
-    buffer.seek(0)
-    return buffer
+    """Generate a PDF invoice for an order"""
+    try:
+        # Create a file-like buffer to receive PDF data
+        buffer = BytesIO()
+        
+        # Set up the document with letter size paper
+        doc = SimpleDocTemplate(
+            buffer,
+            pagesize=letter,
+            rightMargin=72,
+            leftMargin=72,
+            topMargin=72,
+            bottomMargin=72
+        )
+        
+        # Styles
+        styles = getSampleStyleSheet()
+        styles.add(ParagraphStyle(
+            name='Center',
+            parent=styles['Heading1'],
+            alignment=1,  # 0=left, 1=center, 2=right
+        ))
+        
+        # Document title
+        title = Paragraph("Order Invoice", styles['Center'])
+        
+        # Invoice details
+        date_style = styles["Normal"]
+        date_style.alignment = 2  # Right align
+        date_text = f"Invoice Date: {datetime.now().strftime('%B %d, %Y')}"
+        date = Paragraph(date_text, date_style)
+        
+        # Create data table
+        data = [
+            ["Invoice Number:", f"INV-{str(order_data.get('_id', ''))[:8]}"],
+            ["Order Date:", str(order_data.get('created_at', 'N/A'))],
+            ["Payment ID:", order_data.get('payment_id', 'N/A')],
+            ["Total Amount:", f"₹{order_data.get('total_amount', 0)}"],
+        ]
+        
+        # Create the table
+        table = Table(data, colWidths=[2*inch, 3.5*inch])
+        table.setStyle(TableStyle([
+            ('BACKGROUND', (0, 0), (0, -1), colors.lightgrey),
+            ('TEXTCOLOR', (0, 0), (0, -1), colors.black),
+            ('ALIGN', (0, 0), (0, -1), 'LEFT'),
+            ('ALIGN', (1, 0), (1, -1), 'LEFT'),
+            ('FONTNAME', (0, 0), (0, -1), 'Helvetica-Bold'),
+            ('FONTNAME', (1, 0), (1, -1), 'Helvetica'),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 10),
+            ('TOPPADDING', (0, 0), (-1, -1), 10),
+            ('GRID', (0, 0), (-1, -1), 1, colors.black),
+        ]))
+        
+        # Items table headers
+        items_data = [["Item", "Price"]]
+        
+        # Add items to the table
+        for item in order_data.get('items', []):
+            items_data.append([item.get('name', 'Unknown Item'), f"₹{item.get('price', 0)}"])
+        
+        # Create the items table
+        items_table = Table(items_data, colWidths=[4*inch, 1.5*inch])
+        items_table.setStyle(TableStyle([
+            ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
+            ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+            ('ALIGN', (0, 0), (-1, 0), 'CENTER'),
+            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+            ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
+            ('BACKGROUND', (0, 1), (-1, -1), colors.beige),
+            ('GRID', (0, 0), (-1, -1), 1, colors.black),
+        ]))
+        
+        # Build the document with all elements
+        elements = [
+            title,
+            Spacer(1, 0.5*inch),
+            date,
+            Spacer(1, 0.5*inch),
+            table,
+            Spacer(1, 0.5*inch),
+            Paragraph("Items Purchased:", styles["Heading3"]),
+            Spacer(1, 0.25*inch),
+            items_table,
+            Spacer(1, 0.5*inch),
+            Paragraph("Thank you for your purchase!", styles["BodyText"]),
+        ]
+        
+        # Write the document to the buffer
+        doc.build(elements)
+        
+        # Reset buffer position to the beginning
+        buffer.seek(0)
+        
+        return buffer
+    except Exception as e:
+        print(f"Error generating invoice PDF: {str(e)}")
+        traceback.print_exc()
+        raise
 
 def generate_receipt_pdf(order_data):
     # Simplified version for receipts
@@ -295,3 +294,114 @@ def generate_auction_invoice_pdf(auction_data):
     doc.build(elements)
     buffer.seek(0)
     return buffer
+
+def generate_bid_invoice_pdf(bid_data):
+    """Generate a PDF invoice for a bid auction"""
+    try:
+        # Create a file-like buffer to receive PDF data
+        buffer = BytesIO()
+        
+        # Set up the document with letter size paper
+        doc = SimpleDocTemplate(
+            buffer,
+            pagesize=letter,
+            rightMargin=72,
+            leftMargin=72,
+            topMargin=72,
+            bottomMargin=72
+        )
+        
+        # Styles
+        styles = getSampleStyleSheet()
+        styles.add(ParagraphStyle(
+            name='Center',
+            parent=styles['Heading1'],
+            alignment=1,  # 0=left, 1=center, 2=right
+        ))
+        
+        # Document title
+        title = Paragraph("Auction Invoice", styles['Center'])
+        
+        # Invoice details
+        date_style = styles["Normal"]
+        date_style.alignment = 2  # Right align
+        date_text = f"Invoice Date: {datetime.now().strftime('%B %d, %Y')}"
+        date = Paragraph(date_text, date_style)
+        
+        # Header with auction details
+        header_style = styles["Heading2"]
+        header = Paragraph(f"Auction Item: {bid_data.get('title', 'Auction Item')}", header_style)
+        
+        # Description
+        description_style = styles["BodyText"]
+        description = Paragraph(f"Description: {bid_data.get('description', 'No description available')}", description_style)
+        
+        # Format dates
+        auction_date = "N/A"
+        if bid_data.get("auction_date"):
+            if isinstance(bid_data["auction_date"], str):
+                auction_date = bid_data["auction_date"]
+            else:
+                auction_date = bid_data["auction_date"].strftime("%B %d, %Y")
+                
+        end_date = "N/A"
+        if bid_data.get("end_date"):
+            if isinstance(bid_data["end_date"], str):
+                end_date = bid_data["end_date"]
+            else:
+                end_date = bid_data["end_date"].strftime("%B %d, %Y")
+        
+        # Create data table
+        data = [
+            ["Invoice Number:", f"AUC-{str(bid_data.get('_id', ''))[:8]}"],
+            ["Winner:", bid_data.get("winner", "Unknown")],
+            ["Seller Name:", bid_data.get("seller_name", "Unknown Seller")],
+            ["Category:", bid_data.get("category", "Art")],
+            ["Condition:", bid_data.get("condition", "New")],
+            ["Auction Date:", auction_date],
+            ["End Date:", end_date],
+            ["Final Bid Amount:", f"₹{bid_data.get('final_amount', 0)}"],
+        ]
+        
+        # Create the table
+        table = Table(data, colWidths=[2*inch, 3.5*inch])
+        table.setStyle(TableStyle([
+            ('BACKGROUND', (0, 0), (0, -1), colors.lightgrey),
+            ('TEXTCOLOR', (0, 0), (0, -1), colors.black),
+            ('ALIGN', (0, 0), (0, -1), 'LEFT'),
+            ('ALIGN', (1, 0), (1, -1), 'LEFT'),
+            ('FONTNAME', (0, 0), (0, -1), 'Helvetica-Bold'),
+            ('FONTNAME', (1, 0), (1, -1), 'Helvetica'),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 10),
+            ('TOPPADDING', (0, 0), (-1, -1), 10),
+            ('GRID', (0, 0), (-1, -1), 1, colors.black),
+        ]))
+        
+        # Build the document with all elements
+        elements = [
+            title,
+            Spacer(1, 0.5*inch),
+            date,
+            Spacer(1, 0.5*inch),
+            header,
+            Spacer(1, 0.25*inch),
+            description,
+            Spacer(1, 0.5*inch),
+            table,
+            Spacer(1, 0.5*inch),
+            Paragraph("Thank you for participating in our auction!", styles["BodyText"]),
+            Spacer(1, 0.25*inch),
+            Paragraph("This is an automatically generated invoice for your successful bid.", styles["BodyText"])
+        ]
+        
+        # Write the document to the buffer
+        doc.build(elements)
+        
+        # Reset buffer position to the beginning
+        buffer.seek(0)
+        
+        return buffer
+    except Exception as e:
+        print(f"Error generating bid invoice PDF: {str(e)}")
+        traceback.print_exc()
+        raise

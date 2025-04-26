@@ -1,12 +1,20 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { toast } from 'react-toastify';
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import { faEnvelope, faEye, faExclamationTriangle } from '@fortawesome/free-solid-svg-icons';
 
 const EventParticipants = ({ eventId }) => {
     const [participants, setParticipants] = useState([]);
     const [eventDetails, setEventDetails] = useState(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
+    
+    // Complaint state
+    const [showComplaintModal, setShowComplaintModal] = useState(false);
+    const [selectedParticipant, setSelectedParticipant] = useState(null);
+    const [complaintText, setComplaintText] = useState('');
+    const [submittingComplaint, setSubmittingComplaint] = useState(false);
 
     useEffect(() => {
         if (eventId) {
@@ -53,6 +61,76 @@ const EventParticipants = ({ eventId }) => {
         } catch (err) {
             console.error('Error fetching event details:', err);
             toast.error('Failed to load event details');
+        }
+    };
+
+    const handleComplaintClick = (participant) => {
+        setSelectedParticipant(participant);
+        setComplaintText('');
+        setShowComplaintModal(true);
+    };
+
+    const handleSubmitComplaint = async () => {
+        if (!complaintText.trim()) {
+            toast.error('Please provide complaint details');
+            return;
+        }
+
+        setSubmittingComplaint(true);
+        try {
+            const token = localStorage.getItem('instructortoken');
+            
+            // Get instructor info for the complaint
+            const instructorInfo = await axios.get(
+                'http://localhost:8080/instructor/profile',
+                { headers: { Authorization: `Bearer ${token}` } }
+            ).catch(() => ({ data: { profile: {} } }));
+            
+            const instructorEmail = instructorInfo?.data?.profile?.email || localStorage.getItem('instructor_email') || '';
+            // Get instructor's full name from profile
+            const instructorName = 
+                `${instructorInfo?.data?.profile?.first_name || ''} ${instructorInfo?.data?.profile?.last_name || ''}`.trim() || 
+                'Unnamed Instructor';
+            
+            const complaintData = {
+                complainant_type: 'instructor',
+                complainant_email: instructorEmail,
+                complainant_name: instructorName,
+                type: 'user', // Changed from against_type to type
+                against_id: selectedParticipant.id || '',
+                against_email: selectedParticipant.email,
+                entityName: selectedParticipant.name || 'Anonymous Participant', // Changed from against_name to entityName
+                subject: `Complaint about participant in event: ${eventDetails?.name || 'Event'}`,
+                description: complaintText,
+                event_id: eventId,
+                event_name: eventDetails?.name || 'Unknown Event'
+            };
+
+            console.log("Submitting complaint:", complaintData);
+
+            const response = await axios.post(
+                'http://localhost:8080/complaints/create',
+                complaintData,
+                { 
+                    headers: { 
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/json'
+                    } 
+                }
+            );
+
+            if (response.data.success) {
+                toast.success('Complaint submitted successfully');
+                setShowComplaintModal(false);
+                setComplaintText('');
+            } else {
+                toast.error(response.data.message || 'Failed to submit complaint');
+            }
+        } catch (err) {
+            console.error('Error submitting complaint:', err);
+            toast.error('Failed to submit complaint. Please try again later.');
+        } finally {
+            setSubmittingComplaint(false);
         }
     };
 
@@ -156,14 +234,21 @@ const EventParticipants = ({ eventId }) => {
                                                 title="Send Email"
                                                 onClick={() => toast.info(`Email feature coming soon for ${participant.email}`)}
                                             >
-                                                <i className="fas fa-envelope"></i>
+                                                <FontAwesomeIcon icon={faEnvelope} />
                                             </button>
                                             <button 
                                                 className="btn btn-outline-success"
                                                 title="View Details"
                                                 onClick={() => toast.info(`Details feature coming soon for ${participant.name}`)}
                                             >
-                                                <i className="fas fa-eye"></i>
+                                                <FontAwesomeIcon icon={faEye} />
+                                            </button>
+                                            <button 
+                                                className="btn btn-outline-danger"
+                                                title="Report to Admin"
+                                                onClick={() => handleComplaintClick(participant)}
+                                            >
+                                                <FontAwesomeIcon icon={faExclamationTriangle} />
                                             </button>
                                         </div>
                                     </td>
@@ -173,6 +258,66 @@ const EventParticipants = ({ eventId }) => {
                     </table>
                 </div>
             </div>
+
+            {/* Complaint Modal */}
+            {showComplaintModal && selectedParticipant && (
+                <div className="modal fade show" style={{ display: 'block' }} tabIndex="-1">
+                    <div className="modal-dialog">
+                        <div className="modal-content">
+                            <div className="modal-header">
+                                <h5 className="modal-title">Report Participant to Admin</h5>
+                                <button 
+                                    type="button" 
+                                    className="btn-close" 
+                                    onClick={() => setShowComplaintModal(false)}
+                                    disabled={submittingComplaint}
+                                ></button>
+                            </div>
+                            <div className="modal-body">
+                                <div className="mb-3">
+                                    <p><strong>Participant:</strong> {selectedParticipant.name} ({selectedParticipant.email})</p>
+                                    <p><strong>Event:</strong> {eventDetails?.name}</p>
+                                </div>
+                                <div className="mb-3">
+                                    <label htmlFor="complaintText" className="form-label">Complaint Details</label>
+                                    <textarea 
+                                        id="complaintText"
+                                        className="form-control" 
+                                        rows="4"
+                                        value={complaintText}
+                                        onChange={(e) => setComplaintText(e.target.value)}
+                                        placeholder="Describe the issue with this participant..."
+                                        required
+                                    ></textarea>
+                                </div>
+                            </div>
+                            <div className="modal-footer">
+                                <button 
+                                    type="button" 
+                                    className="btn btn-secondary" 
+                                    onClick={() => setShowComplaintModal(false)}
+                                    disabled={submittingComplaint}
+                                >
+                                    Cancel
+                                </button>
+                                <button 
+                                    type="button" 
+                                    className="btn btn-danger"
+                                    onClick={handleSubmitComplaint}
+                                    disabled={submittingComplaint || !complaintText.trim()}
+                                >
+                                    {submittingComplaint ? (
+                                        <>
+                                            <span className="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+                                            Submitting...
+                                        </>
+                                    ) : 'Submit Complaint'}
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
 
             <style>{`
                 .table th {
@@ -189,6 +334,12 @@ const EventParticipants = ({ eventId }) => {
                 .badge {
                     font-size: 0.85em;
                     padding: 0.35em 0.65em;
+                }
+                .modal {
+                    background-color: rgba(0, 0, 0, 0.5);
+                }
+                .modal-backdrop {
+                    display: none;
                 }
             `}</style>
         </div>

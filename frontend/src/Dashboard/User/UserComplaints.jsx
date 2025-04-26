@@ -150,6 +150,29 @@ const UserComplaints = () => {
         }
     };
 
+    const fetchUserComplaints = async () => {
+        try {
+            setLoading(true);
+            const token = localStorage.getItem('usertoken');
+            
+            // Update the endpoint to match the renamed endpoint in the backend
+            const response = await axios.get('http://localhost:8080/complaints/my-complaints', {
+                headers: { Authorization: `Bearer ${token}` }
+            });
+            
+            if (response.data.success) {
+                setComplaints(response.data.complaints);
+            } else {
+                toast.error('Failed to load complaints');
+            }
+        } catch (error) {
+            console.error('Error fetching complaints:', error);
+            toast.error('Failed to connect to server');
+        } finally {
+            setLoading(false);
+        }
+    };
+
     const handleChange = (e) => {
         const { name, value } = e.target;
         setFormData({
@@ -567,7 +590,9 @@ const UserComplaints = () => {
                                                 <td>{formatDate(complaint.createdAt)}</td>
                                                 <td>{complaint.subject}</td>
                                                 <td>
-                                                    {complaint.type === 'seller' ? 'Seller: ' : 'Instructor: '}
+                                                    {complaint.type === 'seller' ? 'Seller: ' : 
+                                                    complaint.type === 'instructor' ? 'Instructor: ' : 
+                                                    complaint.type === 'user' ? 'User: ' : 'Unknown: '}
                                                     {complaint.entityName || 'Unknown'}
                                                 </td>
                                                 <td>{getStatusBadge(complaint.status)}</td>

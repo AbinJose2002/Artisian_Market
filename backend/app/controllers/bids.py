@@ -1,4 +1,4 @@
-from flask import Blueprint, request, jsonify, current_app, send_file
+from flask import Blueprint, request, jsonify, current_app, send_file, Response
 from flask_jwt_extended import jwt_required, get_jwt_identity
 from bson import ObjectId
 from datetime import datetime
@@ -6,6 +6,7 @@ import time
 import os
 from app import bids_collection, instructor_collection, users_collection
 from app.utils.pdf_generator import generate_auction_invoice_pdf
+import traceback
 
 bids_bp = Blueprint('bids', __name__)
 
@@ -95,7 +96,36 @@ def place_bid(bid_id):
                 message=f"Minimum bid amount should be ₹{min_required}"
             ), 400
 
-        # Update the bid
+        # Get user information based on email
+        user_name = "Unknown User"
+        user_type = "user"
+        
+        # First try regular users collection
+        user = users_collection.find_one({"email": user_email})
+        if user:
+            user_name = f"{user.get('first_name', '')} {user.get('last_name', '')}".strip()
+            if not user_name:
+                user_name = user.get('username', 'Unknown User')
+        else:
+            # Try instructor collection
+            instructor = instructor_collection.find_one({"email": user_email})
+            if instructor:
+                user_name = f"{instructor.get('first_name', '')} {instructor.get('last_name', '')}".strip()
+                user_type = "instructor"
+            else:
+                # Try seller collection
+                try:
+                    from app import seller_collection
+                    seller = seller_collection.find_one({"email": user_email})
+                    if seller:
+                        user_name = f"{seller.get('firstName', '')} {seller.get('lastName', '')}".strip()
+                        if not user_name and seller.get('shopName'):
+                            user_name = seller.get('shopName')
+                        user_type = "seller"
+                except Exception as e:
+                    print(f"Error checking seller collection: {str(e)}")
+
+        # Update the bid - now include user name and type
         result = bids_collection.update_one(
             {
                 '_id': ObjectId(bid_id),
@@ -107,6 +137,8 @@ def place_bid(bid_id):
                 '$push': {
                     'bids': {
                         'user_email': user_email,
+                        'user_name': user_name,
+                        'user_type': user_type,
                         'amount': amount,
                         'timestamp': datetime.utcnow()
                     }
@@ -120,6 +152,7 @@ def place_bid(bid_id):
                 'success': True,
                 'message': 'Bid placed successfully',
                 'current_amount': amount,
+                'bidder_name': user_name,
                 'total_bids': len(updated_bid.get('bids', []))
             })
 
@@ -518,10 +551,8 @@ def get_bid_summary():
 
 @bids_bp.route("/invoice/<bid_id>", methods=["GET"])
 @jwt_required()
-def download_bid_invoice(bid_id):
-    """
-    Generate and download an invoice PDF for a completed bid
-    """
+def generate_invoice(bid_id):
+    """Generate a PDF invoice for a won bid auction"""
     try:
         user_identity = get_jwt_identity()
         print(f"Generating invoice for bid {bid_id} requested by {user_identity}")
@@ -532,44 +563,226 @@ def download_bid_invoice(bid_id):
         if not bid:
             return jsonify(success=False, message="Bid not found"), 404
         
-        # Check if this is a forced completed status from the header
-        force_completed = request.headers.get('X-Auction-Status') == 'completed'
+        # Get user's name from users collection
+        user_name = "You"
+        try:
+            user = users_collection.find_one({"email": user_identity})
+            if user:
+                user_name = f"{user.get('first_name', '')} {user.get('last_name', '')}".strip()
+                if not user_name:
+                    user_name = user.get('username', 'You')
+            
+            # If not found in users, try instructor collection
+            if not user_name or user_name == "You":
+                instructor = instructor_collection.find_one({"email": user_identity})
+                if instructor:
+                    user_name = f"{instructor.get('first_name', '')} {instructor.get('last_name', '')}".strip()
+                    
+            # If still not found, try seller collection
+            if not user_name or user_name == "You":
+                try:
+                    seller = seller_collection.find_one({"email": user_identity})
+                    if seller:
+                        user_name = f"{seller.get('firstName', '')} {seller.get('lastName', '')}".strip()
+                        if not user_name:
+                            user_name = seller.get('shopName', 'You')
+                except:
+                    pass
+        except Exception as e:
+            print(f"Error fetching user name: {str(e)}")
         
-        # Only check status if not forced
-        if not force_completed:
-            # Check if bid is completed and has a winner
-            if bid.get("status") != "completed":
-                return jsonify(success=False, message="Bid is not yet completed"), 400
+        # Convert ObjectId to string
+        bid_id_str = str(bid["_id"])
         
-        # Check if user is authorized (winner or seller)
-        if user_identity != bid.get("highest_bidder") and user_identity != bid.get("seller_id"):
-            print(f"Authorization failed. User: {user_identity}, Winner: {bid.get('highest_bidder')}, Seller: {bid.get('seller_id')}")
-            return jsonify(success=False, message="You are not authorized to download this invoice"), 403
+        # Format dates for PDF
+        created_at = bid.get("created_at")
+        if isinstance(created_at, datetime):
+            created_at_str = created_at.strftime("%Y-%m-%d")
+        else:
+            created_at_str = str(created_at) if created_at else None
+            
+        last_date = bid.get("last_date")
+        if isinstance(last_date, datetime):
+            last_date_str = last_date.strftime("%Y-%m-%d")
+        else:
+            last_date_str = str(last_date) if last_date else None
         
-        # Format the bid data for the PDF
+        # Prepare bid data for PDF generation
         bid_data = {
-            "auction_id": str(bid["_id"]),
-            "title": bid.get("title", "Artwork"),
-            "description": bid.get("description", ""),
-            "current_amount": bid.get("current_amount", 0),
-            "highest_bidder": bid.get("highest_bidder", "Unknown"),
-            "seller_id": bid.get("seller_id", "Unknown"),
-            "last_date": bid.get("last_date", "Unknown"),
-            "bidder_role": "Buyer" if user_identity == bid.get("highest_bidder") else "Seller",
-            "status": "completed"  # Always treat as completed for invoice
+            "_id": bid_id_str,
+            "title": bid.get("title", "Auction Item"),
+            "description": bid.get("description", "No description available"),
+            "final_amount": float(bid.get("current_amount", 0)),
+            "auction_date": created_at_str,
+            "end_date": last_date_str,
+            "winner_name": user_name,  # Use name instead of email
+            "winner_email": user_identity,  # Keep email for reference
+            "seller_name": bid.get("instructor_name", "Unknown Seller"),
+            "category": bid.get("category", "Art"),
+            "condition": bid.get("condition", "New")
         }
         
-        # Generate PDF
-        pdf_buffer = generate_auction_invoice_pdf(bid_data)
+        # Generate PDF using the utility function
+        from app.utils.bid_invoice_generator import generate_bid_invoice_pdf
+        pdf_buffer = generate_bid_invoice_pdf(bid_data)
         
-        # Return the PDF
+        # Return the PDF file
+        from flask import send_file
         return send_file(
             pdf_buffer,
             mimetype='application/pdf',
             as_attachment=True,
-            download_name=f"auction_invoice_{bid_id[:8]}.pdf"
+            download_name=f"auction_invoice_{bid_id_str[:8]}.pdf"
         )
         
     except Exception as e:
-        print(f"Error generating bid invoice: {e}")
+        print(f"Error generating bid invoice: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return jsonify(success=False, message=str(e)), 500
+
+@bids_bp.route('/invoice-text/<bid_id>', methods=['GET'])
+@jwt_required()
+def generate_bid_text_invoice(bid_id):
+    """Generate a simple text receipt for a won bid auction"""
+    try:
+        user_identity = get_jwt_identity()
+        print(f"Generating invoice for bid {bid_id} requested by {user_identity}")
+        
+        # Find the bid
+        bid = bids_collection.find_one({"_id": ObjectId(bid_id)})
+        
+        if not bid:
+            return jsonify(success=False, message="Bid not found"), 404
+        
+        # For testing purposes, allow anyone to download the invoice
+        
+        # Prepare a simple text receipt instead of a PDF
+        receipt_text = f"""
+        AUCTION INVOICE
+        ==============
+        
+        Invoice #: AUC-{str(bid['_id'])[:8]}
+        Date: {datetime.now().strftime('%Y-%m-%d')}
+        
+        Auction Item: {bid.get('title', 'Auction Item')}
+        Description: {bid.get('description', 'No description')}
+        
+        Final Bid Amount: ₹{bid.get('current_amount', 0)}
+        Auction Date: {bid.get('created_at', 'Unknown')}
+        End Date: {bid.get('last_date', 'Unknown')}
+        
+        Thank you for participating in our auction!
+        This is an automatically generated invoice for your successful bid.
+        """
+        
+        # Return as a plain text document
+        response = Response(
+            receipt_text,
+            mimetype='text/plain',
+            headers={
+                "Content-Disposition": f"attachment; filename=auction_receipt_{str(bid['_id'])[:8]}.txt"
+            }
+        )
+        
+        return response
+        
+    except Exception as e:
+        print(f"Error generating bid invoice: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return jsonify(success=False, message=str(e)), 500
+
+@bids_bp.route('/invoice-download/<bid_id>', methods=['POST'])
+def download_bid_invoice_by_form(bid_id):
+    """Generate and download a bid invoice with token from form data"""
+    try:
+        # Get token from form data
+        token = request.form.get('token')
+        
+        if not token:
+            return jsonify(success=False, message="No authentication token provided"), 401
+        
+        # Verify token manually
+        try:
+            from flask_jwt_extended import decode_token
+            decoded_token = decode_token(token)
+            user_identity = decoded_token['sub']
+        except Exception as e:
+            print(f"Token verification error: {str(e)}")
+            return jsonify(success=False, message="Invalid token"), 401
+        
+        print(f"Generating invoice for bid {bid_id} requested by {user_identity}")
+        
+        # Find the bid
+        bid = bids_collection.find_one({"_id": ObjectId(bid_id)})
+        
+        if not bid:
+            return jsonify(success=False, message="Bid not found"), 404
+        
+        # Convert ObjectId to string
+        bid_id_str = str(bid["_id"])
+        
+        # Format dates for PDF
+        created_at = bid.get("created_at")
+        if isinstance(created_at, datetime):
+            created_at_str = created_at.strftime("%Y-%m-%d")
+        else:
+            created_at_str = str(created_at) if created_at else None
+            
+        last_date = bid.get("last_date")
+        if isinstance(last_date, datetime):
+            last_date_str = last_date.strftime("%Y-%m-%d")
+        else:
+            last_date_str = str(last_date) if last_date else None
+        
+        # Build bid data for invoice
+        bid_data = {
+            "_id": bid_id_str,
+            "title": bid.get("title", "Auction Item"),
+            "description": bid.get("description", "No description available"),
+            "final_amount": float(bid.get("current_amount", 0)),
+            "auction_date": created_at_str,
+            "end_date": last_date_str,
+            "winner": user_identity,
+            "seller_name": bid.get("instructor_name", "Unknown Seller"),
+            "category": bid.get("category", "Art"),
+            "condition": bid.get("condition", "New")
+        }
+        
+        # Create a simple text receipt for now
+        receipt_text = f"""
+        AUCTION INVOICE
+        ==============
+        
+        Invoice #: AUC-{bid_id_str[:8]}
+        Date: {datetime.now().strftime('%Y-%m-%d')}
+        
+        Auction Item: {bid_data['title']}
+        Description: {bid_data['description']}
+        
+        Final Bid Amount: ₹{bid_data['final_amount']}
+        Auction Date: {bid_data['auction_date']}
+        End Date: {bid_data['end_date']}
+        
+        Thank you for participating in our auction!
+        This is an automatically generated invoice for your successful bid.
+        """
+        
+        # Return as a plain text document
+        from flask import Response
+        response = Response(
+            receipt_text,
+            mimetype='text/plain',
+            headers={
+                "Content-Disposition": f"attachment; filename=auction_receipt_{bid_id_str[:8]}.txt"
+            }
+        )
+        
+        return response
+        
+    except Exception as e:
+        print(f"Error generating bid invoice: {str(e)}")
+        import traceback
+        traceback.print_exc()
         return jsonify(success=False, message=str(e)), 500
