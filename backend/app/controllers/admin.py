@@ -1,7 +1,7 @@
 from flask import Blueprint, request, jsonify
 from flask_jwt_extended import create_access_token, jwt_required, get_jwt_identity
-from app import admin_collection, bcrypt, db
-from datetime import datetime
+from app import admin_collection, bcrypt, db, users_collection  # Add users_collection to imports
+from datetime import datetime, timedelta
 from bson import ObjectId  # Add this import
 
 # Add this line to define bids_collection
@@ -140,6 +140,80 @@ def block_user(user_id):
         )
         return jsonify(success=True, message="User blocked successfully")
     except Exception as e:
+        return jsonify(success=False, message=str(e)), 500
+
+@admin_bp.route('/user/<user_id>/ban-temporary', methods=['PUT'])
+@jwt_required()
+def ban_user_temporary(user_id):
+    try:
+        admin_email = get_jwt_identity()
+        admin = admin_collection.find_one({'email': admin_email})
+        
+        if not admin:
+            return jsonify(success=False, message="Admin not found"), 404
+        
+        # Calculate ban end date (10 days from now)
+        ban_end_date = datetime.utcnow() + timedelta(days=10)
+        
+        print(f"Setting ban until: {ban_end_date} ({type(ban_end_date)})")
+        
+        # Update user with temporary ban
+        result = users_collection.update_one(
+            {'_id': ObjectId(user_id)},
+            {'$set': {
+                'banned_until': ban_end_date,
+                'is_blocked': False  # Make sure permanent block is not set
+            }}
+        )
+        
+        if result.modified_count == 0:
+            return jsonify(success=False, message="User not found or already banned"), 404
+            
+        return jsonify(success=True, message="User temporarily banned for 10 days")
+        
+    except Exception as e:
+        print(f"Error banning user: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return jsonify(success=False, message=str(e)), 500
+
+@admin_bp.route('/user/<user_id>/enable', methods=['PUT'])
+@jwt_required()
+def enable_user(user_id):
+    try:
+        admin_email = get_jwt_identity()
+        admin = admin_collection.find_one({'email': admin_email})
+        
+        if not admin:
+            return jsonify(success=False, message="Admin not found"), 404
+        
+        # Convert string ID to ObjectId
+        user_object_id = ObjectId(user_id)
+        
+        # Remove ban and block status
+        result = users_collection.update_one(
+            {'_id': user_object_id},
+            {'$set': {
+                'is_blocked': False,
+                'banned_until': None
+            }}
+        )
+        
+        if result.modified_count == 0:
+            # If nothing was modified, check if user exists
+            user = users_collection.find_one({'_id': user_object_id})
+            if not user:
+                return jsonify(success=False, message="User not found"), 404
+            else:
+                # User exists but wasn't modified (might already be enabled)
+                return jsonify(success=True, message="User is already enabled")
+            
+        return jsonify(success=True, message="User access restored successfully")
+        
+    except Exception as e:
+        print(f"Error enabling user: {str(e)}")
+        import traceback
+        traceback.print_exc()
         return jsonify(success=False, message=str(e)), 500
 
 @admin_bp.route('/bids', methods=['GET'])
@@ -335,4 +409,132 @@ def reject_bid_request(bid_id):
             
     except Exception as e:
         print(f"Error rejecting bid request: {str(e)}")
+        return jsonify(success=False, message=str(e)), 500
+
+@admin_bp.route('/user/<user_id>/stats', methods=['GET'])
+@jwt_required()
+def get_user_stats(user_id):
+    """Get detailed statistics for a specific user"""
+    try:
+        # Verify admin access
+        admin_email = get_jwt_identity()
+        admin = admin_collection.find_one({'email': admin_email})
+        
+        if not admin:
+            return jsonify(success=False, message="Unauthorized access"), 401
+        
+        # Find the user
+        user = users_collection.find_one({'_id': ObjectId(user_id)})
+        if not user:
+            return jsonify(success=False, message="User not found"), 404
+            
+        # Initialize statistics object
+        from app import orders_collection, events_collection
+        # Import product_reviews_collection correctly from reviews.py
+        from app.controllers.reviews import product_reviews_collection
+        
+        stats = {
+            'orderCount': 0,
+            'totalSpent': 0,
+            'reviewCount': 0,
+            'eventCount': 0,
+            'wishlistCount': len(user.get('wishlist', [])),
+            'lastActive': user.get('last_login', user.get('created_at')),
+            'joinDate': user.get('created_at', datetime.utcnow()),
+            'activityGraph': []
+        }
+        
+        # Get user orders
+        try:
+            orders = list(orders_collection.find({
+                '$or': [
+                    {'user_identity': user.get('email')},
+                    {'user_email': user.get('email')}
+                ]
+            }))
+            
+            stats['orderCount'] = len(orders)
+            
+            # Calculate total spent
+            for order in orders:
+                # Add order amount to total spent
+                if 'total_amount' in order:
+                    stats['totalSpent'] += float(order['total_amount'])
+                else:
+                    # If no total_amount, calculate from items
+                    items = order.get('items', [])
+                    for item in items:
+                        stats['totalSpent'] += float(item.get('price', 0))
+        except Exception as e:
+            print(f"Error calculating order statistics: {str(e)}")
+        
+        # Get user reviews
+        try:
+            reviews = list(product_reviews_collection.find({
+                'user_email': user.get('email')
+            }))
+            stats['reviewCount'] = len(reviews)
+        except Exception as e:
+            print(f"Error calculating review statistics: {str(e)}")
+        
+        # Get event participation
+        try:
+            # Find events where this user is registered
+            events = list(events_collection.find({
+                'registered_users.user_id': user.get('email')
+            }))
+            stats['eventCount'] = len(events)
+        except Exception as e:
+            print(f"Error calculating event statistics: {str(e)}")
+        
+        # Generate activity graph (monthly activity based on orders, reviews, etc.)
+        try:
+            # Create monthly buckets for the last 6 months
+            months = []
+            current_date = datetime.utcnow()
+            
+            for i in range(5, -1, -1):
+                month_date = current_date - timedelta(days=30*i)
+                months.append({
+                    'month': month_date.strftime('%b'),
+                    'year': month_date.year,
+                    'month_num': month_date.month,
+                    'activity': 0
+                })
+            
+            # Count activities by month
+            for order in orders:
+                if 'created_at' in order:
+                    order_date = order['created_at']
+                    for month in months:
+                        if order_date.year == month['year'] and order_date.month == month['month_num']:
+                            month['activity'] += 1
+            
+            for review in reviews:
+                if 'created_at' in review:
+                    review_date = review['created_at']
+                    for month in months:
+                        if review_date.year == month['year'] and review_date.month == month['month_num']:
+                            month['activity'] += 1
+            
+            # Format for response
+            stats['activityGraph'] = [{'month': m['month'], 'activity': m['activity']} for m in months]
+        except Exception as e:
+            print(f"Error generating activity graph: {str(e)}")
+            # Fallback to empty graph
+            stats['activityGraph'] = [
+                {'month': 'Jan', 'activity': 0},
+                {'month': 'Feb', 'activity': 0},
+                {'month': 'Mar', 'activity': 0},
+                {'month': 'Apr', 'activity': 0},
+                {'month': 'May', 'activity': 0},
+                {'month': 'Jun', 'activity': 0}
+            ]
+        
+        return jsonify(success=True, stats=stats)
+        
+    except Exception as e:
+        print(f"Error getting user statistics: {str(e)}")
+        import traceback
+        traceback.print_exc()
         return jsonify(success=False, message=str(e)), 500

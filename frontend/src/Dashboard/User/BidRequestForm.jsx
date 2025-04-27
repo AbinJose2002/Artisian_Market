@@ -5,6 +5,7 @@ import { toast } from 'react-toastify';
 const BidRequestForm = ({ onRequestSubmitted }) => {
     const [loading, setLoading] = useState(false);
     const [errors, setErrors] = useState({});
+    const [customCategory, setCustomCategory] = useState('');
     const [formData, setFormData] = useState({
         title: '',
         description: '',
@@ -72,6 +73,15 @@ const BidRequestForm = ({ onRequestSubmitted }) => {
         } else {
             setFormData(prev => ({ ...prev, [name]: value }));
         }
+        
+        // Reset custom category when category changes to something other than "Others"
+        if (name === 'category' && value !== 'Others') {
+            setCustomCategory('');
+        }
+    };
+
+    const handleCustomCategoryChange = (e) => {
+        setCustomCategory(e.target.value);
     };
 
     const validate = () => {
@@ -86,6 +96,7 @@ const BidRequestForm = ({ onRequestSubmitted }) => {
         if (!formData.lastDate) newErrors.lastDate = "End date is required";
         if (selectedDate <= currentDate) newErrors.lastDate = "End date must be in the future";
         if (!formData.image) newErrors.image = "Image is required";
+        if (formData.category === 'Others' && !customCategory.trim()) newErrors.customCategory = "Please specify a category";
         
         setErrors(newErrors);
         return Object.keys(newErrors).length === 0;
@@ -105,8 +116,15 @@ const BidRequestForm = ({ onRequestSubmitted }) => {
             }
 
             const formDataToSend = new FormData();
+            
+            // Use all form data fields
             Object.keys(formData).forEach(key => {
-                formDataToSend.append(key, formData[key]);
+                // If category is 'Others', use the custom category instead
+                if (key === 'category' && formData[key] === 'Others') {
+                    formDataToSend.append(key, customCategory.trim());
+                } else {
+                    formDataToSend.append(key, formData[key]);
+                }
             });
 
             const response = await axios.post(
@@ -138,6 +156,7 @@ const BidRequestForm = ({ onRequestSubmitted }) => {
                     lastName: '',
                     mobile: ''
                 });
+                setCustomCategory('');
                 // Notify parent component
                 if (onRequestSubmitted) {
                     onRequestSubmitted();
@@ -210,6 +229,22 @@ const BidRequestForm = ({ onRequestSubmitted }) => {
                                 ))}
                             </select>
                         </div>
+
+                        {/* Add custom category field when "Others" is selected */}
+                        {formData.category === 'Others' && (
+                            <div className="col-md-6">
+                                <label className="form-label">Specify Category</label>
+                                <input
+                                    type="text"
+                                    className={`form-control ${errors.customCategory ? 'is-invalid' : ''}`}
+                                    value={customCategory}
+                                    onChange={handleCustomCategoryChange}
+                                    placeholder="Enter custom category"
+                                    required
+                                />
+                                {errors.customCategory && <div className="invalid-feedback">{errors.customCategory}</div>}
+                            </div>
+                        )}
 
                         <div className="col-md-6">
                             <label className="form-label">Condition</label>
